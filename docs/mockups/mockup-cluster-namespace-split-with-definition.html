@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cluster vs namespace + definition panel</title>
+  <style>
+    :root {
+      --bg: #f0f2f5;
+      --card: #ffffff;
+      --text: #1a1d24;
+      --muted: #4a5568;
+      --value: #0f1419;
+      --accent: #2563eb;
+      --border: #cbd5e0;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0.75rem; min-height: 100vh; font-size: 14px; }
+    .page-title { font-size: 0.85rem; margin: 0 0 0.5rem 0; color: var(--muted); font-weight: normal; }
+    .toolbar { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+    .toolbar button { padding: 0.4rem 0.75rem; background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+    .toolbar button:hover { border-color: var(--accent); }
+    .layout { display: grid; grid-template-columns: 1fr 1fr minmax(220px, 280px); gap: 1rem; max-width: 1300px; }
+    @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } }
+    .panel { background: var(--card); border-radius: 8px; padding: 0.75rem 1rem; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .panel h2 { font-size: 0.7rem; margin: 0 0 0.5rem 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .input-section { margin-bottom: 0.6rem; }
+    .input-section:last-child { margin-bottom: 0; }
+    .input-section-title { font-size: 0.65rem; color: var(--text); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.3rem; padding-bottom: 0.2rem; border-bottom: 1px solid var(--border); }
+    .input-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.6rem 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .input-card:last-of-type { margin-bottom: 0; }
+    .input-card-title { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem; padding-bottom: 0.15rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .input-card-title input[type="text"] { flex: 1; min-width: 0; font-size: 0.75rem; padding: 0.2rem 0.4rem; border: 1px solid var(--border); border-radius: 4px; }
+    .input-card-title .remove-ns { font-size: 0.65rem; color: var(--muted); cursor: pointer; text-decoration: none; }
+    .input-card-title .remove-ns:hover { color: var(--text); }
+    .add-namespace-wrap { margin-top: 0.5rem; }
+    .add-namespace-wrap button { padding: 0.3rem 0.6rem; font-size: 0.75rem; background: var(--card); border: 1px dashed var(--border); color: var(--muted); border-radius: 6px; cursor: pointer; }
+    .add-namespace-wrap button:hover { border-color: var(--accent); color: var(--accent); }
+    .input-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; font-size: 0.78rem; }
+    .input-row label { min-width: 9rem; color: var(--muted); cursor: pointer; }
+    .input-row label:hover { color: var(--accent); }
+    .input-row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); max-width: 120px; }
+    .input-row .value { min-width: 2.5rem; color: var(--value); font-weight: 600; text-align: right; font-size: 0.72rem; }
+    .output-section { margin-bottom: 1rem; }
+    .output-section:last-child { margin-bottom: 0; }
+    .output-section-title { font-size: 0.65rem; color: var(--text); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; padding-bottom: 0.25rem; border-bottom: 1px solid var(--border); }
+    .output-card { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.75rem; margin-bottom: 0.75rem; }
+    .output-card:last-child { margin-bottom: 0; }
+    .output-card-title { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem; padding-bottom: 0.15rem; border-bottom: 1px solid var(--border); }
+    .output-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.8rem; padding: 0.2rem 0; }
+    .output-row .k { color: var(--muted); }
+    .output-row .v { font-weight: 600; color: var(--value); }
+    .output-row.primary { font-size: 0.9rem; padding: 0.25rem 0; }
+    .output-row.primary .k { color: var(--text); font-weight: 600; }
+    .output-row.primary .v { font-size: 1.2rem; font-weight: 700; color: var(--value); }
+    .output-section-placeholder { font-size: 0.7rem; color: var(--muted); font-style: italic; padding: 0.25rem 0; }
+    .help-column { background: transparent; border: none; box-shadow: none; padding: 0.75rem 0 0 0; }
+    .param-help { font-size: 0.8rem; color: var(--muted); line-height: 1.45; }
+    .param-help .placeholder { font-style: italic; color: var(--muted); opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <div class="page-title">Cluster vs namespace + definition panel (help text on right)</div>
+  <div class="toolbar">
+    <button type="button">Load from defaults</button>
+    <button type="button">Load from collectinfo</button>
+    <button type="button">Export</button>
+  </div>
+
+  <div class="layout">
+    <div class="panel">
+      <h2>Inputs</h2>
+
+      <div class="input-card">
+        <div class="input-card-title">Cluster (topology, server, resilience)</div>
+        <div class="input-row"><label>Cluster name</label><input type="text" value="wishrprde1" placeholder="Cluster name" style="max-width: 10rem;"><span class="value"></span></div>
+        <div class="input-row"><label class="param-label" data-key="nodes_per_cluster">Nodes per cluster</label><input type="range" min="1" max="64" value="18"><span class="value">18</span></div>
+        <div class="input-row"><label class="param-label" data-key="devices_per_node">Devices per node</label><input type="range" min="1" max="24" value="22"><span class="value">22</span></div>
+        <div class="input-row"><label class="param-label" data-key="device_size_gb">Device size (GB)</label><input type="range" min="64" max="4096" value="55" step="64"><span class="value">55</span></div>
+        <div class="input-row"><label class="param-label" data-key="available_memory_gb">Available memory/node (GB)</label><input type="range" min="16" max="512" value="64" step="16"><span class="value">64</span></div>
+        <div class="input-row"><label class="param-label" data-key="overhead_pct">Overhead %</label><input type="range" min="0" max="0.5" value="0.15" step="0.01"><span class="value">0.15</span></div>
+        <div class="input-row"><label class="param-label" data-key="nodes_lost">Nodes lost (failure)</label><input type="range" min="0" max="16" value="0"><span class="value">0</span></div>
+      </div>
+
+      <div class="input-card">
+        <div class="input-card-title">Namespaces (workload)</div>
+        <div class="input-card">
+          <div class="input-card-title">
+            <input type="text" value="wi-pzn" placeholder="Namespace name">
+            <a href="#" class="remove-ns" title="Remove namespace">Remove</a>
+          </div>
+          <div class="input-row"><label class="param-label" data-key="replication_factor">Replication factor</label><input type="range" min="1" max="4" value="2"><span class="value">2</span></div>
+          <div class="input-row"><label class="param-label" data-key="master_object_count">Master object count</label><input type="range" min="10000" max="10000000000" value="500000000"><span class="value">6.4 G</span></div>
+          <div class="input-row"><label class="param-label" data-key="avg_record_size_bytes">Avg record size (bytes)</label><input type="range" min="100" max="10000000" value="1200" step="100"><span class="value">1200</span></div>
+          <div class="input-row"><label class="param-label" data-key="read_pct">Read %</label><input type="range" min="0" max="1" value="0.24" step="0.01"><span class="value">0.24</span></div>
+          <div class="input-row"><label class="param-label" data-key="write_pct">Write %</label><input type="range" min="0" max="1" value="0.76" step="0.01"><span class="value">0.76</span></div>
+          <div class="input-row"><label>Tombstone %</label><input type="range" min="0" max="0.5" value="0" step="0.01"><span class="value">0</span></div>
+          <div class="input-row"><label>SI count</label><input type="range" min="0" max="20" value="0"><span class="value">0</span></div>
+          <div class="input-row"><label>SI entries per object</label><input type="range" min="0" max="10" value="0" step="0.1"><span class="value">0</span></div>
+        </div>
+        <div class="input-card">
+          <div class="input-card-title">
+            <input type="text" value="Namespace 2" placeholder="Namespace name">
+            <a href="#" class="remove-ns" title="Remove namespace">Remove</a>
+          </div>
+          <div class="input-row"><label class="param-label" data-key="replication_factor">Replication factor</label><input type="range" min="1" max="4" value="2"><span class="value">2</span></div>
+          <div class="input-row"><label>Master object count</label><input type="range" min="10000" max="10000000000" value="100000000"><span class="value">100 M</span></div>
+          <div class="input-row"><label>Avg record size (bytes)</label><input type="range" min="100" max="10000000" value="500" step="100"><span class="value">500</span></div>
+          <div class="input-row"><label>Read %</label><input type="range" min="0" max="1" value="0.5" step="0.01"><span class="value">0.50</span></div>
+          <div class="input-row"><label>Write %</label><input type="range" min="0" max="1" value="0.5" step="0.01"><span class="value">0.50</span></div>
+          <div class="input-row"><label>Tombstone %</label><input type="range" min="0" max="0.5" value="0" step="0.01"><span class="value">0</span></div>
+          <div class="input-row"><label>SI count</label><input type="range" min="0" max="20" value="1"><span class="value">1</span></div>
+          <div class="input-row"><label>SI entries per object</label><input type="range" min="0" max="10" value="0.5" step="0.1"><span class="value">0.5</span></div>
+        </div>
+        <div class="add-namespace-wrap">
+          <button type="button">+ Add namespace</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Outputs</h2>
+      <div class="output-section">
+        <div class="output-section-title">Healthy cluster</div>
+        <div class="output-card">
+          <div class="output-card-title">Storage</div>
+          <div class="output-row primary"><span class="k">Storage utilization %</span><span class="v">18.71%</span></div>
+          <div class="output-row"><span class="k">Data stored (GB)</span><span class="v">3978.24</span></div>
+          <div class="output-row"><span class="k">Device total storage (TB)</span><span class="v">21.27</span></div>
+          <div class="output-row"><span class="k">Total available storage (GB)</span><span class="v">21257.75</span></div>
+          <div class="output-row"><span class="k">Total device count</span><span class="v">396</span></div>
+        </div>
+        <div class="output-card">
+          <div class="output-card-title">Memory</div>
+          <div class="output-row primary"><span class="k">Memory utilization (base) %</span><span class="v">85%</span></div>
+          <div class="output-row"><span class="k">Available mem per cluster (GB)</span><span class="v">979.20</span></div>
+          <div class="output-row"><span class="k">Total memory used base (GB)</span><span class="v">832.32</span></div>
+        </div>
+      </div>
+      <div class="output-section">
+        <div class="output-section-title">Failure (0 nodes lost)</div>
+        <div class="output-card">
+          <div class="output-row primary"><span class="k">Failure storage utilization %</span><span class="v">18.71%</span></div>
+          <div class="output-row primary"><span class="k">Failure memory utilization %</span><span class="v">85%</span></div>
+          <div class="output-row"><span class="k">Effective nodes</span><span class="v">18</span></div>
+        </div>
+      </div>
+      <div class="output-section">
+        <div class="output-section-title">Data growth</div>
+        <div class="output-section-placeholder">Coming later</div>
+      </div>
+      <div class="output-section">
+        <div class="output-section-title">Performance</div>
+        <div class="output-section-placeholder">Coming later</div>
+      </div>
+    </div>
+
+    <div class="panel help-column">
+      <div id="paramHelp" class="param-help">
+        <span class="placeholder">Click a parameter name for details.</span>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function() {
+      var help = {
+        nodes_per_cluster: 'Total number of nodes in the cluster. Affects total storage, memory, and device count.',
+        devices_per_node: 'Storage devices per node. Combined with device size and nodes to determine total cluster storage.',
+        device_size_gb: 'Capacity of each storage device in GB. Total device storage = nodes × devices per node × device size.',
+        available_memory_gb: 'RAM available per node for Aerospike (data and indexes). Used to compute memory utilization.',
+        overhead_pct: 'Fraction of memory reserved for overhead (e.g. indexes, system). Remaining memory is used for data and tombstones.',
+        nodes_lost: 'Number of nodes assumed lost in the failure scenario. Used to compute effective nodes and failure utilization.',
+        replication_factor: 'Number of copies of each record across the cluster. Higher values improve availability but use more storage and memory.',
+        master_object_count: 'Total number of primary (master) records in the namespace. Used with record size to compute data stored and memory used.',
+        avg_record_size_bytes: 'Average size of one record in bytes. With object count, determines total data stored and memory usage.',
+        read_pct: 'Fraction of operations that are reads (0–1). With write % defines the read/write mix for the workload.',
+        write_pct: 'Fraction of operations that are writes (0–1). Typically read_pct + write_pct = 1.'
+      };
+      var placeholder = '<span class="placeholder">Click a parameter name for details.</span>';
+      var el = document.getElementById('paramHelp');
+      document.querySelectorAll('.input-row label[data-key]').forEach(function(label) {
+        label.classList.add('param-label');
+        label.addEventListener('click', function() {
+          var key = this.getAttribute('data-key');
+          el.innerHTML = help[key] || placeholder;
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

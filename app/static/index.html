@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aerospike Capacity Planner</title>
+  <style>
+    :root {
+      --bg: #f0f2f5;
+      --card: #ffffff;
+      --text: #1a1d24;
+      --muted: #4a5568;
+      --value: #0f1419;
+      --accent: #2563eb;
+      --border: #cbd5e0;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0.75rem; min-height: 100vh; font-size: 14px; }
+    .page-title { font-size: 1.1rem; margin: 0 0 0.5rem 0; color: var(--text); font-weight: 600; }
+    .toolbar { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+    .toolbar button { padding: 0.4rem 0.75rem; background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+    .toolbar button:hover { border-color: var(--accent); }
+    .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; max-width: 1100px; }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+    .panel { background: var(--card); border-radius: 8px; padding: 0.75rem 1rem; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .panel h2 { font-size: 0.7rem; margin: 0 0 0.5rem 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .input-section { margin-bottom: 0.6rem; }
+    .input-section:last-child { margin-bottom: 0; }
+    .input-section-title { font-size: 0.65rem; color: var(--text); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.3rem; padding-bottom: 0.2rem; border-bottom: 1px solid var(--border); }
+    .input-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; font-size: 0.78rem; }
+    .input-row label { min-width: 9rem; color: var(--muted); }
+    .input-row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); max-width: 120px; }
+    .input-row .value { min-width: 2.5rem; color: var(--value); font-weight: 600; text-align: right; font-size: 0.72rem; }
+    .input-row label.param-label { cursor: pointer; }
+    .input-row label.param-label:hover { color: var(--accent); }
+    .input-row label.param-label.selected { color: var(--accent); font-weight: 600; }
+    .param-help { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--muted); line-height: 1.4; min-height: 2.5rem; }
+    .param-help .placeholder { font-style: italic; }
+    .output-section { margin-bottom: 1rem; }
+    .output-section:last-child { margin-bottom: 0; }
+    .output-section-title { font-size: 0.65rem; color: var(--text); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; padding-bottom: 0.25rem; border-bottom: 1px solid var(--border); }
+    .output-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.6rem 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .output-card:last-child { margin-bottom: 0; }
+    .output-card-title { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem; padding-bottom: 0.15rem; border-bottom: 1px solid var(--border); }
+    .output-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.8rem; padding: 0.2rem 0; }
+    .output-row .k { color: var(--muted); }
+    .output-row .v { font-weight: 600; color: var(--value); }
+    .output-row.primary { font-size: 0.9rem; padding: 0.25rem 0; }
+    .output-row.primary .k { color: var(--text); font-weight: 600; }
+    .output-row.primary .v { font-size: 1.2rem; font-weight: 700; color: var(--value); }
+    .output-section-placeholder { font-size: 0.7rem; color: var(--muted); font-style: italic; padding: 0.25rem 0; }
+  </style>
+</head>
+<body>
+  <div class="page-title">Aerospike Capacity Planner</div>
+  <div class="toolbar">
+    <button type="button" id="loadDefaults">Load from defaults</button>
+    <button type="button" id="loadCollectinfo">Load from collectinfo</button>
+    <input type="file" id="collectinfoFile" accept=".zip,.txt,.log,application/zip,text/plain" style="display: none;">
+    <button type="button" id="exportBtn">Export</button>
+  </div>
+
+  <div class="layout">
+    <div class="panel">
+      <h2>Inputs</h2>
+      <div id="inputs"></div>
+      <div id="paramHelp" class="param-help"><span class="placeholder">Click a parameter name for details.</span></div>
+    </div>
+    <div class="panel">
+      <h2>Outputs</h2>
+      <div id="outputs">Loading…</div>
+    </div>
+  </div>
+
+  <script>
+    const INPUT_LABELS = [
+      { key: 'replication_factor', label: 'Replication factor', log: false },
+      { key: 'nodes_per_cluster', label: 'Nodes per cluster', log: false },
+      { key: 'devices_per_node', label: 'Devices per node', log: false },
+      { key: 'device_size_gb', label: 'Device size (GB)', log: false },
+      { key: 'available_memory_gb', label: 'Available memory per node (GB)', log: false },
+      { key: 'overhead_pct', label: 'Overhead %', log: false },
+      { key: 'master_object_count', label: 'Master object count', log: true },
+      { key: 'avg_record_size_bytes', label: 'Avg record size (bytes)', log: false },
+      { key: 'read_pct', label: 'Read %', log: false },
+      { key: 'write_pct', label: 'Write %', log: false },
+      { key: 'tombstone_pct', label: 'Tombstone %', log: false },
+      { key: 'si_count', label: 'SI count', log: false },
+      { key: 'si_entries_per_object', label: 'SI entries per object', log: false },
+      { key: 'nodes_lost', label: 'Nodes lost (failure)', log: false },
+    ];
+    let INPUT_SPEC = [];
+
+    const INPUT_SECTIONS = [
+      { title: 'Topology', keys: ['replication_factor', 'nodes_per_cluster', 'devices_per_node', 'device_size_gb'] },
+      { title: 'Server / memory', keys: ['available_memory_gb', 'overhead_pct'] },
+      { title: 'Workload', keys: ['master_object_count', 'avg_record_size_bytes', 'read_pct', 'write_pct', 'tombstone_pct', 'si_count', 'si_entries_per_object'] },
+      { title: 'Resilience', keys: ['nodes_lost'] },
+    ];
+
+    const PARAM_HELP = {
+      replication_factor: 'Number of copies of each record across the cluster. Higher values improve availability but use more storage and memory.',
+      nodes_per_cluster: 'Total number of nodes in the cluster. Affects total storage, memory, and device count.',
+      devices_per_node: 'Storage devices per node. Combined with device size and nodes to determine total cluster storage.',
+      device_size_gb: 'Capacity of each storage device in GB. Total device storage = nodes × devices per node × device size.',
+      available_memory_gb: 'RAM available per node for Aerospike (data and indexes). Used to compute memory utilization.',
+      overhead_pct: 'Fraction of memory reserved for overhead (e.g. indexes, system). Remaining memory is used for data and tombstones.',
+      master_object_count: 'Total number of primary (master) records in the namespace. Used with record size to compute data stored and memory used.',
+      avg_record_size_bytes: 'Average size of one record in bytes. With object count, determines total data stored and memory usage.',
+      read_pct: 'Fraction of operations that are reads (0–1). With write % defines the read/write mix for the workload.',
+      write_pct: 'Fraction of operations that are writes (0–1). Typically read_pct + write_pct = 1.',
+      tombstone_pct: 'Fraction of records that are tombstones (deleted but not yet reclaimed). Increases memory usage until expiration.',
+      si_count: 'Number of secondary indexes on the namespace. Each index adds memory and storage overhead.',
+      si_entries_per_object: 'Average secondary index entries per object. With SI count, affects memory and storage for indexes.',
+      nodes_lost: 'Number of nodes assumed lost in the failure scenario. Used to compute effective nodes and failure utilization.',
+    };
+
+    let state = {};
+
+    const SCHEMA_DEFAULTS = {
+      replication_factor: { min: 1, max: 4, step: 1 },
+      nodes_per_cluster: { min: 1, max: 64, step: 1 },
+      devices_per_node: { min: 1, max: 24, step: 1 },
+      device_size_gb: { min: 64, max: 4096, step: 64 },
+      available_memory_gb: { min: 16, max: 1024, step: 16 },
+      overhead_pct: { min: 0, max: 0.5, step: 0.01 },
+      master_object_count: { min: 1e4, max: 1e12, step: 1e6 },
+      avg_record_size_bytes: { min: 100, max: 1e7, step: 10000 },
+      read_pct: { min: 0, max: 1, step: 0.01 },
+      write_pct: { min: 0, max: 1, step: 0.01 },
+      tombstone_pct: { min: 0, max: 0.5, step: 0.01 },
+      si_count: { min: 0, max: 20, step: 1 },
+      si_entries_per_object: { min: 0, max: 10, step: 0.1 },
+      nodes_lost: { min: 0, max: 16, step: 1 },
+    };
+    function buildInputSpec(schema) {
+      INPUT_SPEC = INPUT_LABELS.map(item => {
+        const s = schema && schema[item.key] ? schema[item.key] : SCHEMA_DEFAULTS[item.key];
+        return s ? { ...item, min: s.min, max: s.max, step: s.step } : { ...item, min: 0, max: 1, step: 0.01 };
+      });
+    }
+
+    function formatLargeNumber(n) {
+      const num = Number(n);
+      if (num >= 1e9) return (num / 1e9).toFixed(1).replace(/\.0$/, '') + ' B';
+      if (num >= 1e6) return (num / 1e6).toFixed(1).replace(/\.0$/, '') + ' M';
+      if (num >= 1e3) return (num / 1e3).toFixed(1).replace(/\.0$/, '') + ' K';
+      return num.toLocaleString();
+    }
+
+    function formatNumber(val, key) {
+      const n = Number(val);
+      if (isNaN(n)) return '—';
+      if (key === 'device_size_gb') return n % 1 === 0 ? n : n.toFixed(2);
+      if (key === 'avg_record_size_bytes') return n >= 1000 ? Math.round(n).toLocaleString() : n.toFixed(2);
+      if (['read_pct', 'write_pct', 'overhead_pct', 'tombstone_pct'].includes(key)) return n.toFixed(2);
+      if (Number.isInteger(n)) return n;
+      return n.toFixed(2);
+    }
+
+    function renderInputs(values) {
+      const el = document.getElementById('inputs');
+      el.innerHTML = INPUT_SECTIONS.map(section => {
+        const rows = section.keys.map(key => {
+          const spec = INPUT_SPEC.find(s => s.key === key);
+          if (!spec) return '';
+          const v = Number(values[spec.key]);
+          const clamped = Math.max(spec.min, Math.min(spec.max, isNaN(v) ? spec.min : v));
+          const disp = spec.log ? formatLargeNumber(v) : formatNumber(v, spec.key);
+          return `
+            <div class="input-row">
+              <label class="param-label" data-key="${spec.key}" tabindex="0">${spec.label}</label>
+              <input type="range" data-key="${spec.key}" min="${spec.min}" max="${spec.max}" step="${spec.step}" value="${clamped}">
+              <span class="value" data-value="${spec.key}">${disp}</span>
+            </div>
+          `;
+        }).join('');
+        return `
+          <div class="input-section">
+            <div class="input-section-title">${section.title}</div>
+            ${rows}
+          </div>
+        `;
+      }).join('');
+
+      el.querySelectorAll('input[type="range"]').forEach(input => {
+        input.addEventListener('input', () => {
+          const key = input.dataset.key;
+          const spec = INPUT_SPEC.find(s => s.key === key);
+          const val = parseFloat(input.value);
+          state[key] = val;
+          const span = el.querySelector(`[data-value="${key}"]`);
+          span.textContent = spec.log ? formatLargeNumber(val) : formatNumber(val, spec.key);
+          compute();
+        });
+      });
+
+      el.querySelectorAll('label.param-label').forEach(label => {
+        const key = label.dataset.key;
+        const showHelp = () => {
+          el.querySelectorAll('label.param-label').forEach(l => l.classList.remove('selected'));
+          label.classList.add('selected');
+          const helpEl = document.getElementById('paramHelp');
+          const text = PARAM_HELP[key] || 'No description available.';
+          helpEl.innerHTML = text;
+        };
+        label.addEventListener('click', showHelp);
+        label.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showHelp(); } });
+      });
+    }
+
+    async function fetchDefaults() {
+      const r = await fetch('/api/defaults');
+      if (!r.ok) throw new Error(r.statusText);
+      return r.json();
+    }
+
+    async function compute() {
+      const r = await fetch('/api/compute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(state),
+      });
+      if (!r.ok) throw new Error(r.statusText);
+      const out = await r.json();
+      renderOutputs(out);
+      return out;
+    }
+
+    function fmt(n) {
+      if (typeof n !== 'number') return n;
+      return n < 1e6 ? n.toFixed(2) : n.toExponential(2);
+    }
+
+    function renderOutputs(o) {
+      const nodesLost = state.nodes_lost != null ? Math.round(state.nodes_lost) : 0;
+      const memNote = o.memory_utilization_base_pct > 100 ? ' <span style="font-size:0.75em; color: var(--muted);">(over-subscribed)</span>' : '';
+      const failMemNote = o.failure_memory_utilization_pct > 100 ? ' <span style="font-size:0.75em; color: var(--muted);">(over-subscribed)</span>' : '';
+      document.getElementById('outputs').innerHTML = `
+        <div class="output-section">
+          <div class="output-section-title">Healthy cluster</div>
+          <div class="output-card">
+            <div class="output-card-title">Storage</div>
+            <div class="output-row primary"><span class="k">Storage utilization %</span><span class="v">${fmt(o.storage_utilization_pct)}%</span></div>
+            <div class="output-row"><span class="k">Data stored (GB)</span><span class="v">${fmt(o.data_stored_gb)}</span></div>
+            <div class="output-row"><span class="k">Device total storage (TB)</span><span class="v">${fmt(o.device_total_storage_tb)}</span></div>
+            <div class="output-row"><span class="k">Total available storage (GB)</span><span class="v">${fmt(o.total_available_storage_gb)}</span></div>
+            <div class="output-row"><span class="k">Total device count</span><span class="v">${fmt(o.total_device_count)}</span></div>
+          </div>
+          <div class="output-card">
+            <div class="output-card-title">Memory</div>
+            <div class="output-row primary"><span class="k">Memory utilization (base) %</span><span class="v">${fmt(o.memory_utilization_base_pct)}%${memNote}</span></div>
+            <div class="output-row"><span class="k">Memory utilization (w/ tombstones) %</span><span class="v">${fmt(o.memory_utilization_with_tombstones_pct)}%</span></div>
+            <div class="output-row"><span class="k">Available mem per cluster (GB)</span><span class="v">${fmt(o.available_mem_per_cluster_gb)}</span></div>
+            <div class="output-row"><span class="k">Total memory used base (GB)</span><span class="v">${fmt(o.total_memory_used_base_gb)}</span></div>
+          </div>
+        </div>
+        <div class="output-section">
+          <div class="output-section-title">Failure (${nodesLost} nodes lost)</div>
+          <div class="output-card">
+            <div class="output-row primary"><span class="k">Failure storage utilization %</span><span class="v">${fmt(o.failure_storage_utilization_pct)}%</span></div>
+            <div class="output-row primary"><span class="k">Failure memory utilization %</span><span class="v">${fmt(o.failure_memory_utilization_pct)}%${failMemNote}</span></div>
+            <div class="output-row"><span class="k">Effective nodes</span><span class="v">${fmt(o.effective_nodes)}</span></div>
+            <div class="output-row"><span class="k">Failure total available storage (GB)</span><span class="v">${fmt(o.failure_total_available_storage_gb)}</span></div>
+            <div class="output-row"><span class="k">Failure memory used (GB)</span><span class="v">${fmt(o.failure_memory_used_gb)}</span></div>
+          </div>
+        </div>
+        <div class="output-section">
+          <div class="output-section-title">Data growth</div>
+          <div class="output-section-placeholder">Coming later</div>
+        </div>
+        <div class="output-section">
+          <div class="output-section-title">Performance</div>
+          <div class="output-section-placeholder">Coming later</div>
+        </div>
+      `;
+    }
+
+    document.getElementById('loadDefaults').addEventListener('click', async () => {
+      const def = await fetchDefaults();
+      state = { ...def };
+      renderInputs(state);
+      await compute();
+    });
+
+    document.getElementById('loadCollectinfo').addEventListener('click', () => {
+      document.getElementById('collectinfoFile').click();
+    });
+
+    document.getElementById('collectinfoFile').addEventListener('change', async (e) => {
+      const input = e.target;
+      const file = input.files && input.files[0];
+      if (!file) return;
+      input.value = '';
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const r = await fetch('/api/load-collectinfo', {
+          method: 'POST',
+          body: formData,
+        });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({ detail: r.statusText }));
+          alert(err.detail || r.statusText);
+          return;
+        }
+        const inputs = await r.json();
+        state = { ...inputs };
+        renderInputs(state);
+        await compute();
+      } catch (err) {
+        alert(err.message || 'Load from collectinfo failed');
+      }
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', async () => {
+      const out = await compute();
+      const blob = new Blob([JSON.stringify({ inputs: state, outputs: out }, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'capacity-plan.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    (async () => {
+      const schema = await fetch('/api/schema').then(r => r.ok ? r.json() : {});
+      buildInputSpec(schema);
+      const def = await fetchDefaults();
+      state = { ...def };
+      renderInputs(state);
+      await compute();
+    })();
+  </script>
+</body>
+</html>

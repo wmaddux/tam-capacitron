@@ -1,0 +1,268 @@
+"""
+Collectinfo ingestion via asadm: run asadm -cf <bundle> -e "summary" (and optional
+commands), parse output, and return a dict for the mapping layer.
+Requires asadm on PATH. See docs/COLLECTINFO_INPUT_MAPPING.md.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import shutil
+import subprocess
+from pathlib import Path
+
+
+def run_asadm(bundle_path: str, command: str, timeout: int = 60) -> tuple[str | None, str | None]:
+    """
+    Run asadm in collectinfo-analyzer mode: asadm -cf <bundle_path> -e "<command>".
+    Returns (stdout, stderr). Returns (None, error_message) on failure.
+    """
+    if not shutil.which("asadm"):
+        return None, "asadm not found on PATH"
+    path = str(Path(bundle_path).resolve())
+    if not Path(path).is_file():
+        return None, f"Bundle not found: {path}"
+    try:
+        result = subprocess.run(
+            ["asadm", "-cf", path, "-e", command],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        if result.returncode != 0:
+            return None, result.stderr or result.stdout or f"asadm exited {result.returncode}"
+        return result.stdout, None
+    except FileNotFoundError:
+        return None, "asadm not found on PATH"
+    except subprocess.TimeoutExpired:
+        return None, "asadm timed out"
+
+
+def _parse_size(s: str) -> float:
+    """Parse human sizes: 21.270 TB, 3.885 TB, 6.447 G, 1.000 M, 500 K. Returns numeric value."""
+    s = (s or "").strip()
+    if not s:
+        return 0.0
+    s = s.replace(",", "")
+    m = re.match(r"^([\d.]+)\s*([KMGTP]?)\s*$", s, re.IGNORECASE)
+    if not m:
+        try:
+            return float(s)
+        except ValueError:
+            return 0.0
+    num = float(m.group(1))
+    suffix = (m.group(2) or "").upper()
+    if suffix == "K":
+        return num * 1e3
+    if suffix == "M":
+        return num * 1e6
+    if suffix == "G":
+        return num * 1e9
+    if suffix == "T":
+        return num * 1e12
+    if suffix == "P":
+        return num * 1e15
+    return num
+
+
+def _parse_pct(s: str) -> float:
+    """Parse percentage: '24.0 %' or '31.95 %' -> 0.24, 0.3195."""
+    s = (s or "").strip().replace("%", "").strip()
+    if not s:
+        return 0.0
+    try:
+        v = float(s)
+        if v > 1:
+            return v / 100.0
+        return v
+    except ValueError:
+        return 0.0
+
+
+def _row_object_count(row: dict[str, str]) -> float:
+    """Return object count for a namespace summary row. Uses Objects then Master (same key for selection and value)."""
+    raw = row.get("Objects", row.get("Master", "")) or ""
+    return _parse_size(raw)
+
+
+def _cluster_summary_table(lines: list[str]) -> dict[str, str]:
+    """Extract key|value pairs from Cluster Summary section (pipe-delimited)."""
+    out = {}
+    for line in lines:
+        if "|" not in line:
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) >= 2 and parts[0] and not parts[0].startswith("~"):
+            key = re.sub(r"\s+", " ", parts[0])
+            out[key] = parts[1]
+    return out
+
+
+def _namespace_summary_rows(lines: list[str]) -> list[dict[str, str]]:
+    """
+    Parse Namespace Summary table: find header row (first line with Namespace;
+    often followed by a subheader with Total, Per-Node, Factors, Read%, Objects).
+    Use the line with more columns as header so data rows align.
+    """
+    rows = []
+    header = None
+    seen_namespace_line = False
+    for line in lines:
+        if "|" not in line:
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if not parts:
+            continue
+        if "Namespace" in (parts[0] or "") and "Drives" in " ".join(parts):
+            seen_namespace_line = True
+            header = [re.sub(r"\s+", " ", p) or f"col_{i}" for i, p in enumerate(parts)]
+            continue
+        if seen_namespace_line and header is not None:
+            # Next line may be subheader (Total, Per-Node, Factors, Read%, Objects) with more columns
+            if len(parts) > len(header) and ("Factors" in " ".join(parts) or "Read%" in " ".join(parts) or "Objects" in " ".join(parts)):
+                header = [re.sub(r"\s+", " ", p) or f"col_{i}" for i, p in enumerate(parts)]
+                if not header[0]:
+                    header[0] = "Namespace"
+                continue
+            first = (parts[0] or "").strip()
+            if first and not first.isdigit() and not first.startswith("col_") and "~" not in first:
+                row = {}
+                for i, h in enumerate(header):
+                    if i < len(parts) and h and "~" not in (h or ""):
+                        row[h] = parts[i].strip()
+                if row:
+                    rows.append(row)
+    return rows
+
+
+def parse_summary_output(raw: str, namespace: str | None = None) -> dict:
+    """
+    Parse asadm summary text output. Returns a dict with keys expected by
+    ingestor_output_to_capacity_inputs (nodes_per_cluster, devices_per_node,
+    device_size_gb, replication_factor, object_count, read_pct, write_pct, etc.).
+    If namespace is set, use that namespace row; else use first data row (or largest by Master).
+    """
+    out: dict = {}
+    if not raw or not raw.strip():
+        return out
+    lines = raw.splitlines()
+    in_cluster = False
+    in_ns = False
+    cluster_lines: list[str] = []
+    ns_lines: list[str] = []
+    for line in lines:
+        if "Cluster Summary" in line or "~~~~~~~~~~Cluster Summary" in line:
+            in_cluster = True
+            in_ns = False
+            continue
+        if "Namespace Summary" in line or "~~~~~~~~~~Namespace Summary" in line:
+            in_cluster = False
+            in_ns = True
+            continue
+        if in_cluster:
+            if "Number of rows" in line or ("~~~" in line and "Cluster" not in line):
+                in_cluster = False
+            else:
+                cluster_lines.append(line)
+        if in_ns:
+            if "Number of rows" in line:
+                in_ns = False
+            else:
+                ns_lines.append(line)
+    cs = _cluster_summary_table(cluster_lines)
+    ns_rows = _namespace_summary_rows(ns_lines)
+    if not ns_rows:
+        ns_rows = []
+    # Cluster fields
+    cluster_size = cs.get("Cluster Size")
+    if cluster_size:
+        try:
+            out["nodes_per_cluster"] = float(cluster_size.strip())
+        except ValueError:
+            pass
+    devices_total = cs.get("Devices Total")
+    devices_per_node = cs.get("Devices Per-Node")
+    if devices_per_node:
+        try:
+            out["devices_per_node"] = float(devices_per_node.strip())
+        except ValueError:
+            pass
+    device_total_s = cs.get("Device Total")
+    if device_total_s and devices_total:
+        try:
+            total_tb = float(re.sub(r"[^\d.]", "", device_total_s))
+            dev_total = float(devices_total.strip())
+            if dev_total > 0:
+                out["device_size_gb"] = (total_tb * 1024) / dev_total
+        except (ValueError, TypeError, ZeroDivisionError):
+            pass
+    device_used_s = cs.get("Device Used")
+    if device_used_s:
+        used_tb = _parse_size(device_used_s.replace("TB", "T").replace("GB", "G"))
+        if used_tb > 0 and used_tb < 1e6:
+            out["data_used_bytes"] = used_tb * (1024**4)
+    if "data_used_bytes" not in out and device_used_s:
+        try:
+            used_tb = float(re.sub(r"[^\d.]", "", device_used_s))
+            out["data_used_bytes"] = used_tb * (1024**4)
+        except (ValueError, TypeError):
+            pass
+    out["nodes_lost"] = 0.0
+    out["overhead_pct"] = 0.15
+    out.setdefault("available_memory_gb", 64.0)
+    if not ns_rows:
+        return out
+    row = None
+    if namespace:
+        for r in ns_rows:
+            if r.get("Namespace") == namespace:
+                row = r
+                break
+    if row is None:
+        row = max(ns_rows, key=_row_object_count)
+    ns_name = row.get("Namespace", "")
+    repl = row.get("Replication Factors", row.get("Replication", row.get("Factors", "")))
+    if repl:
+        try:
+            out["replication_factor"] = float(repl.strip())
+        except ValueError:
+            pass
+    obj_count = _row_object_count(row)
+    if obj_count > 0:
+        out["object_count"] = obj_count
+    cache_read = row.get("Cache Read%", row.get("Cache Read", row.get("Read%", "")))
+    if cache_read:
+        pct = _parse_pct(cache_read)
+        if 0 <= pct <= 1:
+            out["read_pct"] = pct
+            out["write_pct"] = 1.0 - pct
+    device_total_ns = row.get("Device Total", row.get("Total", ""))
+    drives_total = row.get("Drives Total", row.get("Total", ""))
+    if device_total_ns and drives_total and "device_size_gb" not in out:
+        try:
+            dt = _parse_size(device_total_ns.replace("TB", "T").replace("GB", "G"))
+            if dt > 1e12:
+                dt_gb = dt / (1024**3)
+            else:
+                dt_gb = dt / 1024 if "T" in (device_total_ns or "").upper() else dt
+            dr = float(re.sub(r"[^\d.]", "", drives_total))
+            if dr > 0:
+                out["device_size_gb"] = dt_gb / dr
+        except (ValueError, TypeError, ZeroDivisionError):
+            pass
+    return out
+
+
+def asadm_summary_to_capacity_dict(bundle_path: str, namespace: str | None = None) -> dict:
+    """
+    Run asadm -cf bundle_path -e "summary", parse output, and return dict for mapping layer.
+    If asadm is missing or fails, returns empty dict (caller should fall back to stub).
+    """
+    stdout, err = run_asadm(bundle_path, "summary")
+    if err or not stdout:
+        return {}
+    ns = namespace
+    if ns is None:
+        ns = (os.environ.get("CAPACITRON_NAMESPACE") or "").strip() or None
+    return parse_summary_output(stdout, namespace=ns)

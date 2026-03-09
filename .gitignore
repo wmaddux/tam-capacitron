@@ -1,0 +1,19 @@
+# Virtual env and Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Sample/test bundles (often large)
+bundles/
+
+# Local data and secrets
+aerospike_health.db
+.env
+.env.*
+
+# OS
+.DS_Store

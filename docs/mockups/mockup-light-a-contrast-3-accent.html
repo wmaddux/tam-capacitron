@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contrast 3 – Accent bar + color</title>
+  <style>
+    :root {
+      --bg: #f0f2f5;
+      --card: #ffffff;
+      --text: #1a1d24;
+      --muted: #4a5568;
+      --value: #0f1419;
+      --accent: #2563eb;
+      --border: #cbd5e0;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0.75rem; min-height: 100vh; font-size: 14px; }
+    .page-title { font-size: 0.85rem; margin: 0 0 0.5rem 0; color: var(--muted); font-weight: normal; }
+    .toolbar { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+    .toolbar button { padding: 0.4rem 0.75rem; background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+    .toolbar button:hover { border-color: var(--accent); }
+    .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; max-width: 1100px; }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+    .panel { background: var(--card); border-radius: 8px; padding: 0.75rem 1rem; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .panel h2 { font-size: 0.7rem; margin: 0 0 0.5rem 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .input-section { margin-bottom: 0.6rem; }
+    .input-section:last-child { margin-bottom: 0; }
+    .input-section-title { font-size: 0.65rem; color: var(--text); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.3rem; padding-bottom: 0.2rem; border-bottom: 1px solid var(--border); }
+    .input-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; font-size: 0.78rem; }
+    .input-row label { min-width: 9rem; color: var(--muted); }
+    .input-row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); max-width: 120px; }
+    .input-row .value { min-width: 2.5rem; color: var(--value); font-weight: 600; text-align: right; font-size: 0.72rem; }
+    .output-section { margin-bottom: 1rem; }
+    .output-section:last-child { margin-bottom: 0; }
+    .output-section-title { font-size: 0.65rem; color: var(--text); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; padding-bottom: 0.25rem; border-bottom: 1px solid var(--border); }
+    .output-subsection { margin-bottom: 0.6rem; }
+    .output-subsection:last-child { margin-bottom: 0; }
+    .output-subsection-title { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.25rem; }
+    .output-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.78rem; padding: 0.18rem 0; }
+    .output-row .k { color: var(--muted); }
+    .output-row .v { font-weight: 600; color: var(--value); }
+    /* Primary: left accent bar + accent color value + larger */
+    .output-row.primary {
+      border-left: 4px solid var(--accent);
+      padding-left: 0.5rem;
+      margin-left: -0.5rem;
+      padding-top: 0.25rem;
+      padding-bottom: 0.25rem;
+      font-size: 0.9rem;
+    }
+    .output-row.primary .k { color: var(--text); font-weight: 600; }
+    .output-row.primary .v { font-size: 1.2rem; font-weight: 700; color: var(--accent); }
+    .output-section-placeholder { font-size: 0.7rem; color: var(--muted); font-style: italic; padding: 0.25rem 0; }
+  </style>
+</head>
+<body>
+  <div class="page-title">Contrast 3 – Accent bar + color · Primary = blue bar + blue value</div>
+  <div class="toolbar">
+    <button type="button">Load from defaults</button>
+    <button type="button">Export</button>
+  </div>
+
+  <div class="layout">
+    <div class="panel">
+      <h2>Inputs</h2>
+      <div class="input-section">
+        <div class="input-section-title">Topology</div>
+        <div class="input-row"><label>Replication factor</label><input type="range" min="1" max="4" value="2"><span class="value">2</span></div>
+        <div class="input-row"><label>Nodes per cluster</label><input type="range" min="1" max="64" value="16"><span class="value">16</span></div>
+        <div class="input-row"><label>Devices per node</label><input type="range" min="1" max="24" value="14"><span class="value">14</span></div>
+        <div class="input-row"><label>Device size (GB)</label><input type="range" min="64" max="4096" value="1920" step="64"><span class="value">1920</span></div>
+      </div>
+      <div class="input-section">
+        <div class="input-section-title">Server / memory</div>
+        <div class="input-row"><label>Available memory/node (GB)</label><input type="range" min="16" max="512" value="64" step="16"><span class="value">64</span></div>
+        <div class="input-row"><label>Overhead %</label><input type="range" min="0" max="0.5" value="0.15" step="0.01"><span class="value">0.15</span></div>
+      </div>
+      <div class="input-section">
+        <div class="input-section-title">Workload</div>
+        <div class="input-row"><label>Master object count</label><input type="range" min="10000" max="10000000000" value="500000000"><span class="value">5e+8</span></div>
+        <div class="input-row"><label>Avg record size (bytes)</label><input type="range" min="100" max="50000" value="1200" step="100"><span class="value">1200</span></div>
+        <div class="input-row"><label>Read %</label><input type="range" min="0" max="1" value="0.7" step="0.01"><span class="value">0.7</span></div>
+        <div class="input-row"><label>Write %</label><input type="range" min="0" max="1" value="0.3" step="0.01"><span class="value">0.3</span></div>
+        <div class="input-row"><label>Tombstone %</label><input type="range" min="0" max="0.5" value="0.05" step="0.01"><span class="value">0.05</span></div>
+        <div class="input-row"><label>SI count</label><input type="range" min="0" max="20" value="2"><span class="value">2</span></div>
+        <div class="input-row"><label>SI entries per object</label><input type="range" min="0" max="10" value="1" step="0.1"><span class="value">1</span></div>
+      </div>
+      <div class="input-section">
+        <div class="input-section-title">Resilience</div>
+        <div class="input-row"><label>Nodes lost (failure)</label><input type="range" min="0" max="16" value="2"><span class="value">2</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Outputs</h2>
+      <div class="output-section">
+        <div class="output-section-title">Healthy cluster</div>
+        <div class="output-subsection">
+          <div class="output-subsection-title">Storage</div>
+          <div class="output-row primary"><span class="k">Storage utilization %</span><span class="v">42.3%</span></div>
+          <div class="output-row"><span class="k">Data stored (GB)</span><span class="v">12,450</span></div>
+          <div class="output-row"><span class="k">Device total storage (TB)</span><span class="v">29.4</span></div>
+          <div class="output-row"><span class="k">Total available storage (GB)</span><span class="v">28,120</span></div>
+          <div class="output-row"><span class="k">Total device count</span><span class="v">336</span></div>
+        </div>
+        <div class="output-subsection">
+          <div class="output-subsection-title">Memory</div>
+          <div class="output-row primary"><span class="k">Memory utilization (base) %</span><span class="v">38.1%</span></div>
+          <div class="output-row"><span class="k">Memory utilization (w/ tombstones) %</span><span class="v">41.2%</span></div>
+          <div class="output-row"><span class="k">Available mem per cluster (GB)</span><span class="v">768</span></div>
+          <div class="output-row"><span class="k">Total memory used base (GB)</span><span class="v">293</span></div>
+        </div>
+      </div>
+      <div class="output-section">
+        <div class="output-section-title">Failure (2 nodes lost)</div>
+        <div class="output-subsection">
+          <div class="output-row primary"><span class="k">Failure storage utilization %</span><span class="v">48.6%</span></div>
+          <div class="output-row primary"><span class="k">Failure memory utilization %</span><span class="v">44.1%</span></div>
+          <div class="output-row"><span class="k">Effective nodes</span><span class="v">14</span></div>
+          <div class="output-row"><span class="k">Failure total available storage (GB)</span><span class="v">24,640</span></div>
+          <div class="output-row"><span class="k">Failure memory used (GB)</span><span class="v">275</span></div>
+        </div>
+      </div>
+      <div class="output-section">
+        <div class="output-section-title">Data growth</div>
+        <div class="output-section-placeholder">Coming later</div>
+      </div>
+      <div class="output-section">
+        <div class="output-section-title">Performance</div>
+        <div class="output-section-placeholder">Coming later</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
