@@ -254,6 +254,150 @@ def parse_summary_output(raw: str, namespace: str | None = None) -> dict:
     return out
 
 
+def _build_cluster_dict_from_summary(cs: dict) -> dict:
+    """Build cluster-level dict from cluster summary table."""
+    out: dict = {}
+    cluster_size = cs.get("Cluster Size")
+    if cluster_size:
+        try:
+            out["nodes_per_cluster"] = float(cluster_size.strip())
+        except ValueError:
+            pass
+    devices_total = cs.get("Devices Total")
+    devices_per_node = cs.get("Devices Per-Node")
+    if devices_per_node:
+        try:
+            out["devices_per_node"] = float(devices_per_node.strip())
+        except ValueError:
+            pass
+    device_total_s = cs.get("Device Total")
+    if device_total_s and devices_total:
+        try:
+            total_tb = float(re.sub(r"[^\d.]", "", device_total_s))
+            dev_total = float(devices_total.strip())
+            if dev_total > 0:
+                out["device_size_gb"] = (total_tb * 1024) / dev_total
+        except (ValueError, TypeError, ZeroDivisionError):
+            pass
+    device_used_s = cs.get("Device Used")
+    if device_used_s:
+        used_tb = _parse_size(device_used_s.replace("TB", "T").replace("GB", "G"))
+        if used_tb > 0 and used_tb < 1e6:
+            out["data_used_bytes"] = used_tb * (1024**4)
+    if "data_used_bytes" not in out and device_used_s:
+        try:
+            used_tb = float(re.sub(r"[^\d.]", "", device_used_s))
+            out["data_used_bytes"] = used_tb * (1024**4)
+        except (ValueError, TypeError):
+            pass
+    out["nodes_lost"] = 0.0
+    out["overhead_pct"] = 0.15
+    out.setdefault("available_memory_gb", 64.0)
+    return out
+
+
+def _row_namespace_name(row: dict[str, str]) -> str:
+    """Get namespace name from a summary row; header may be 'Namespace' or ' Namespace'."""
+    for k, v in row.items():
+        if k and "namespace" in k.lower() and (v or "").strip():
+            return (v or "").strip()
+    return (list(row.values())[0] or "").strip() if row else ""
+
+
+def _row_to_namespace_dict(row: dict[str, str], cluster_device_size_gb: float | None) -> dict:
+    """Build one namespace workload dict from a namespace summary row."""
+    ns_name = _row_namespace_name(row)
+    repl = row.get("Replication Factors", row.get("Replication", row.get("Factors", "")))
+    replication_factor = 2.0
+    if repl:
+        try:
+            replication_factor = float(repl.strip())
+        except ValueError:
+            pass
+    obj_count = _row_object_count(row)
+    read_pct = 0.5
+    write_pct = 0.5
+    cache_read = row.get("Cache Read%", row.get("Cache Read", row.get("Read%", "")))
+    if cache_read:
+        pct = _parse_pct(cache_read)
+        if 0 <= pct <= 1:
+            read_pct = pct
+            write_pct = 1.0 - pct
+    device_size_gb = cluster_device_size_gb
+    device_total_ns = row.get("Device Total", row.get("Total", ""))
+    drives_total = row.get("Drives Total", row.get("Total", ""))
+    if device_total_ns and drives_total:
+        try:
+            dt = _parse_size(device_total_ns.replace("TB", "T").replace("GB", "G"))
+            if dt > 1e12:
+                dt_gb = dt / (1024**3)
+            else:
+                dt_gb = dt / 1024 if "T" in (device_total_ns or "").upper() else dt
+            dr = float(re.sub(r"[^\d.]", "", drives_total))
+            if dr > 0:
+                device_size_gb = dt_gb / dr
+        except (ValueError, TypeError, ZeroDivisionError):
+            pass
+    d: dict = {
+        "name": ns_name,
+        "replication_factor": replication_factor,
+        "object_count": obj_count if obj_count > 0 else 1e6,
+        "read_pct": read_pct,
+        "write_pct": write_pct,
+        "tombstone_pct": 0.0,
+        "si_count": 0.0,
+        "si_entries_per_object": 0.0,
+    }
+    if device_size_gb is not None:
+        d["device_size_gb"] = device_size_gb
+    return d
+
+
+def parse_summary_output_multi(raw: str) -> dict:
+    """
+    Parse asadm summary text and return cluster-level dict + list of namespace dicts.
+    Returns { "cluster": {...}, "namespaces": [ {...}, ... ] } for the mapping layer.
+    Cluster has: nodes_per_cluster, devices_per_node, device_size_gb, available_memory_gb,
+    overhead_pct, nodes_lost, data_used_bytes (optional).
+    Each namespace has: name, replication_factor, object_count, read_pct, write_pct,
+    tombstone_pct, si_count, si_entries_per_object, and optionally device_size_gb.
+    """
+    result: dict = {"cluster": {}, "namespaces": []}
+    if not raw or not raw.strip():
+        return result
+    lines = raw.splitlines()
+    in_cluster = False
+    in_ns = False
+    cluster_lines = []
+    ns_lines = []
+    for line in lines:
+        if "Cluster Summary" in line or "~~~~~~~~~~Cluster Summary" in line:
+            in_cluster = True
+            in_ns = False
+            continue
+        if "Namespace Summary" in line or "~~~~~~~~~~Namespace Summary" in line:
+            in_cluster = False
+            in_ns = True
+            continue
+        if in_cluster:
+            if "Number of rows" in line or ("~~~" in line and "Cluster" not in line):
+                in_cluster = False
+            else:
+                cluster_lines.append(line)
+        if in_ns:
+            if "Number of rows" in line:
+                in_ns = False
+            else:
+                ns_lines.append(line)
+    cs = _cluster_summary_table(cluster_lines)
+    result["cluster"] = _build_cluster_dict_from_summary(cs)
+    ns_rows = _namespace_summary_rows(ns_lines)
+    cluster_device_gb = result["cluster"].get("device_size_gb")
+    for row in ns_rows:
+        result["namespaces"].append(_row_to_namespace_dict(row, cluster_device_gb))
+    return result
+
+
 def asadm_summary_to_capacity_dict(bundle_path: str, namespace: str | None = None) -> dict:
     """
     Run asadm -cf bundle_path -e "summary", parse output, and return dict for mapping layer.
@@ -266,3 +410,15 @@ def asadm_summary_to_capacity_dict(bundle_path: str, namespace: str | None = Non
     if ns is None:
         ns = (os.environ.get("CAPACITRON_NAMESPACE") or "").strip() or None
     return parse_summary_output(stdout, namespace=ns)
+
+
+def asadm_summary_to_capacity_multi(bundle_path: str) -> dict:
+    """
+    Run asadm -cf bundle_path -e "summary", parse output, and return cluster + namespaces.
+    Returns { "cluster": {...}, "namespaces": [ {...}, ... ] }. If asadm is missing or
+    fails, returns empty cluster and empty namespaces (caller should fall back to stub).
+    """
+    stdout, err = run_asadm(bundle_path, "summary")
+    if err or not stdout:
+        return {"cluster": {}, "namespaces": []}
+    return parse_summary_output_multi(stdout)

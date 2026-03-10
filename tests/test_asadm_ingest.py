@@ -5,6 +5,7 @@ Unit tests for asadm-based collectinfo ingestion: run_asadm and parse_summary_ou
 import pytest
 from ingest.asadm_ingest import (
     parse_summary_output,
+    parse_summary_output_multi,
     run_asadm,
     asadm_summary_to_capacity_dict,
 )
@@ -92,6 +93,34 @@ cnc-authz-prod|   18|       1|990.000 GB| 0.06 %| 99.0 %|          2|100.0 %|329
 wi-pzn        |  216|      12| 11.602 TB|31.95 %|53.44 %|          2| 24.0 %|  6.447 G|...
 Number of rows: 2
 """
+
+
+def test_parse_summary_output_multi_returns_cluster_and_namespaces():
+    """parse_summary_output_multi returns cluster dict + list of namespace dicts."""
+    multi = parse_summary_output_multi(SAMPLE_SUMMARY)
+    assert "cluster" in multi
+    assert "namespaces" in multi
+    assert isinstance(multi["namespaces"], list)
+    assert multi["cluster"].get("nodes_per_cluster") == 18.0
+    assert multi["cluster"].get("devices_per_node") == 22.0
+    assert len(multi["namespaces"]) == 1
+    assert multi["namespaces"][0].get("name") == "wi-pzn"
+    assert multi["namespaces"][0].get("replication_factor") == 2.0
+    assert multi["namespaces"][0].get("object_count") == pytest.approx(6.447e9, rel=0.01)
+    assert multi["namespaces"][0].get("read_pct") == pytest.approx(0.24, rel=0.01)
+
+
+def test_parse_summary_output_multi_two_namespaces():
+    """parse_summary_output_multi returns one dict per namespace row."""
+    multi = parse_summary_output_multi(MULTI_NS_SUMMARY)
+    assert len(multi["namespaces"]) == 2
+    names = {ns["name"] for ns in multi["namespaces"]}
+    assert "cnc-authz-prod" in names
+    assert "wi-pzn" in names
+    for ns in multi["namespaces"]:
+        assert "replication_factor" in ns
+        assert "object_count" in ns
+        assert "read_pct" in ns
 
 
 def test_parse_summary_output_picks_largest_namespace_by_object_count():

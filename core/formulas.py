@@ -11,7 +11,12 @@ from __future__ import annotations
 MTU_BYTES = 1500.0
 HEADER_OVERHEAD = 320.0
 FRAGMENTATION_FACTOR = 0.024  # (1 - this) = usable storage fraction
-RECORD_METADATA_BYTES = 64.0  # per-record overhead
+RECORD_METADATA_BYTES = 64.0  # per-record overhead (Primary Index Shmem: 64 bytes per replicated object)
+
+# Secondary index shmem (collectinfo-style; see CALCULATION_CATALOG)
+SI_ENTRY_SIZE_BYTES = 32.0  # S: average SI entry size (bytes)
+SI_FILL_FACTOR = 0.75  # F: index fill factor (0–1)
+SI_CUSHION_PER_INDEX_PER_NODE_BYTES = 41_943_040.0  # H: fixed cushion per index per node (~40 MiB)
 
 
 def device_total_storage_tb(
@@ -89,12 +94,65 @@ def available_mem_per_cluster_gb(
     return nodes_per_cluster * available_memory_after_overhead_gb
 
 
-def total_memory_used_base_gb(
-    total_objects: float,
-    avg_record_size_bytes: float,
+def primary_index_shmem_gb(
+    replication_factor: float, master_object_count: float
 ) -> float:
-    """Memory for primary index (data) in GB: total objects × avg record size bytes / 1024³."""
-    return (total_objects * avg_record_size_bytes) / (1024.0**3)
+    """Primary Index Shmem (GB): RF × master object count × 64 bytes / 1024³."""
+    total_objects = replication_factor * master_object_count
+    return (total_objects * RECORD_METADATA_BYTES) / (1024.0**3)
+
+
+def secondary_index_shmem_gb(
+    master_object_count: float,
+    replication_factor: float,
+    si_entries_per_object: float,
+    si_count: float,
+    nodes_per_cluster: float,
+    entry_size_bytes: float = SI_ENTRY_SIZE_BYTES,
+    fill_factor: float = SI_FILL_FACTOR,
+    cushion_per_index_per_node_bytes: float = SI_CUSHION_PER_INDEX_PER_NODE_BYTES,
+) -> float:
+    """
+    Secondary Index Shmem (GB). Collectinfo-style:
+      Entries per index = M × RF × E
+      Data bytes per index ≈ Entries × (S / F)
+      Data bytes (all indexes) = N × data bytes per index
+      Cushion per node (all indexes) = N × H
+      Cushion (all nodes) = cushion per node × K
+      Total SI shmem = Data bytes (all indexes) + Cushion (all nodes)
+    Returns total in GB. Zero if si_count or si_entries_per_object is 0.
+    """
+    if si_count <= 0 or si_entries_per_object <= 0:
+        return 0.0
+    entries_per_index = master_object_count * replication_factor * si_entries_per_object
+    data_bytes_per_index = entries_per_index * (entry_size_bytes / fill_factor)
+    data_bytes_all_indexes = si_count * data_bytes_per_index
+    cushion_per_node = si_count * cushion_per_index_per_node_bytes
+    cushion_all_nodes = cushion_per_node * nodes_per_cluster
+    total_si_bytes = data_bytes_all_indexes + cushion_all_nodes
+    return total_si_bytes / (1024.0**3)
+
+
+def total_memory_used_base_gb(
+    nodes_per_cluster: float,
+    replication_factor: float,
+    master_object_count: float,
+    si_count: float,
+    si_entries_per_object: float,
+) -> float:
+    """
+    Total memory used base (GB) = Primary Index Shmem + Secondary Index Shmem.
+    Per-namespace; engine sums over namespaces.
+    """
+    primary_gb = primary_index_shmem_gb(replication_factor, master_object_count)
+    secondary_gb = secondary_index_shmem_gb(
+        master_object_count,
+        replication_factor,
+        si_entries_per_object,
+        si_count,
+        nodes_per_cluster,
+    )
+    return primary_gb + secondary_gb
 
 
 def storage_utilization_pct(

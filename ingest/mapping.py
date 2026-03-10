@@ -107,3 +107,79 @@ def ingestor_output_to_capacity_inputs(ingestor_output: dict) -> CapacityInputs:
         si_entries_per_object=si_entries_per_object,
         nodes_lost=nodes_lost,
     )
+
+
+def ingestor_multi_to_cluster_and_namespaces(multi_output: dict) -> dict:
+    """
+    Convert multi-namespace ingestor output to API shape: cluster + namespaces.
+
+    multi_output must have "cluster" (dict) and "namespaces" (list of dicts).
+    Returns { "cluster": { cluster_name, nodes_per_cluster, ... }, "namespaces": [ { name, replication_factor, master_object_count, avg_record_size_bytes, ... }, ... ] }.
+    Uses engine defaults for missing values. When there is exactly one namespace and
+    cluster has data_used_bytes, avg_record_size is derived for that namespace.
+    """
+    defaults = get_default_inputs()
+    cluster_in = (multi_output or {}).get("cluster") or {}
+    namespaces_in = (multi_output or {}).get("namespaces") or []
+
+    # Cluster
+    cluster = {
+        "cluster_name": (cluster_in.get("cluster_name") or "").strip(),
+        "nodes_per_cluster": _float(cluster_in, "nodes_per_cluster", defaults.nodes_per_cluster),
+        "devices_per_node": _float(cluster_in, "devices_per_node", defaults.devices_per_node),
+        "device_size_gb": _float(cluster_in, "device_size_gb", defaults.device_size_gb),
+        "available_memory_gb": _float(cluster_in, "available_memory_gb", defaults.available_memory_gb),
+        "overhead_pct": _float(cluster_in, "overhead_pct", defaults.overhead_pct),
+        "nodes_lost": _float(cluster_in, "nodes_lost", 0.0),
+    }
+    if cluster["nodes_per_cluster"] < 1:
+        cluster["nodes_per_cluster"] = defaults.nodes_per_cluster
+
+    # Optional: derive avg_record_size for single namespace when cluster has data_used
+    cluster_data_used = _float(cluster_in, "data_used_bytes", 0.0)
+    single_ns_avg_record: float | None = None
+    if len(namespaces_in) == 1 and cluster_data_used > 0:
+        ns0 = namespaces_in[0]
+        obj = _float(ns0, "object_count", defaults.master_object_count)
+        rf = _float(ns0, "replication_factor", defaults.replication_factor)
+        if obj > 0 and rf > 0:
+            single_ns_avg_record = cluster_data_used / (obj * rf)
+            single_ns_avg_record = max(1.0, min(single_ns_avg_record, 10**7))
+
+    namespaces = []
+    for ns_in in namespaces_in:
+        master_object_count = _float(ns_in, "master_object_count", defaults.master_object_count)
+        if master_object_count == defaults.master_object_count:
+            master_object_count = _float(ns_in, "object_count", defaults.master_object_count)
+        replication_factor = _float(ns_in, "replication_factor", defaults.replication_factor)
+        read_pct = _float(ns_in, "read_pct", defaults.read_pct)
+        write_pct = _float(ns_in, "write_pct", defaults.write_pct)
+        if read_pct <= 0 and write_pct <= 0:
+            read_pct, write_pct = defaults.read_pct, defaults.write_pct
+        avg_record_size_bytes = _float(ns_in, "avg_record_size_bytes", defaults.avg_record_size_bytes)
+        if avg_record_size_bytes == defaults.avg_record_size_bytes and single_ns_avg_record is not None:
+            avg_record_size_bytes = single_ns_avg_record
+        namespaces.append({
+            "name": (ns_in.get("name") or "").strip(),
+            "replication_factor": replication_factor,
+            "master_object_count": master_object_count,
+            "avg_record_size_bytes": avg_record_size_bytes,
+            "read_pct": read_pct,
+            "write_pct": write_pct,
+            "tombstone_pct": _float(ns_in, "tombstone_pct", defaults.tombstone_pct),
+            "si_count": _float(ns_in, "si_count", defaults.si_count),
+            "si_entries_per_object": _float(ns_in, "si_entries_per_object", defaults.si_entries_per_object),
+        })
+    if not namespaces:
+        namespaces = [{
+            "name": "",
+            "replication_factor": defaults.replication_factor,
+            "master_object_count": defaults.master_object_count,
+            "avg_record_size_bytes": defaults.avg_record_size_bytes,
+            "read_pct": defaults.read_pct,
+            "write_pct": defaults.write_pct,
+            "tombstone_pct": defaults.tombstone_pct,
+            "si_count": defaults.si_count,
+            "si_entries_per_object": defaults.si_entries_per_object,
+        }]
+    return {"cluster": cluster, "namespaces": namespaces}

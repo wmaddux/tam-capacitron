@@ -69,3 +69,48 @@ def test_mapping_stub_output_produces_valid_inputs():
     assert out.storage_utilization_pct >= 0
     assert out.memory_utilization_base_pct >= 0
     assert out.effective_nodes == inp.nodes_per_cluster - inp.nodes_lost
+
+
+def test_ingestor_multi_to_cluster_and_namespaces():
+    from ingest.mapping import ingestor_multi_to_cluster_and_namespaces
+
+    multi = {
+        "cluster": {
+            "nodes_per_cluster": 9.0,
+            "devices_per_node": 2.0,
+            "device_size_gb": 1024.0,
+            "available_memory_gb": 128.0,
+            "overhead_pct": 0.15,
+            "nodes_lost": 0.0,
+        },
+        "namespaces": [
+            {
+                "name": "ns1",
+                "replication_factor": 2.0,
+                "object_count": 1e9,
+                "read_pct": 0.6,
+                "write_pct": 0.4,
+                "tombstone_pct": 0.0,
+                "si_count": 0.0,
+                "si_entries_per_object": 0.0,
+            },
+        ],
+    }
+    out = ingestor_multi_to_cluster_and_namespaces(multi)
+    assert "cluster" in out
+    assert "namespaces" in out
+    assert out["cluster"]["nodes_per_cluster"] == 9.0
+    assert out["cluster"]["devices_per_node"] == 2.0
+    assert len(out["namespaces"]) == 1
+    assert out["namespaces"][0]["name"] == "ns1"
+    assert out["namespaces"][0]["replication_factor"] == 2.0
+    assert out["namespaces"][0]["master_object_count"] == 1e9
+    assert out["namespaces"][0]["read_pct"] == 0.6
+
+
+def test_ingestor_multi_to_cluster_and_namespaces_empty_namespaces_uses_default():
+    from ingest.mapping import ingestor_multi_to_cluster_and_namespaces
+
+    out = ingestor_multi_to_cluster_and_namespaces({"cluster": {"nodes_per_cluster": 4.0}, "namespaces": []})
+    assert len(out["namespaces"]) == 1
+    assert out["namespaces"][0]["master_object_count"] == get_default_inputs().master_object_count

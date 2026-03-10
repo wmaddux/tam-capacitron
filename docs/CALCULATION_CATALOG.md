@@ -36,6 +36,10 @@ All capacity calculations implemented in this application are derived from two s
 | MTU_BYTES | C21 | 1500 | MTU / packet size |
 | HEADER_OVERHEAD | C22 | 320 | Header overhead |
 | FRAGMENTATION_FACTOR | C23 | 0.024 | (1 − C23) = usable storage fraction |
+| RECORD_METADATA_BYTES | — | 64 | Primary Index Shmem: 64 bytes per replicated object |
+| SI_ENTRY_SIZE_BYTES (S) | — | 32 | Average SI entry size (bytes); collectinfo-style |
+| SI_FILL_FACTOR (F) | — | 0.75 | SI index fill factor (0–1) |
+| SI_CUSHION_PER_INDEX_PER_NODE_BYTES (H) | — | 41,943,040 | Fixed cushion per index per node (~40 MiB); collectinfo-style |
 | (others) | C40, C41, C42 | 21, 0.75, 16 | Used in memory/storage limits |
 
 ### Calculations (calcManual and related)
@@ -51,7 +55,9 @@ All capacity calculations implemented in this application are derived from two s
 | Usable storage per node (GB) | `usable_storage_per_node_gb` | Devices per node × device size GB × (1 − fragmentation factor) | C55 term: C7×C8×(1−C23) |
 | Total usable storage cluster (GB) | `total_usable_storage_cluster_gb` | Nodes × devices per node × device size GB × (1 − fragmentation factor) | C55 = C6×C7×C8×(1−C23) |
 | Available memory per cluster (GB) | `available_mem_per_cluster_gb` | Nodes per cluster × available memory after overhead per node | C59 = C6×C18 |
-| Total memory used base (GB) | `total_memory_used_base_gb` | Total objects × avg record size bytes ÷ 1024³ | C37 = C36×C28/1024³ |
+| Primary Index Shmem (GB) | `primary_index_shmem_gb` | (RF × master object count × 64 bytes) ÷ 1024³ | Per namespace; 64 = RECORD_METADATA_BYTES |
+| Secondary Index Shmem (GB) | `secondary_index_shmem_gb` | Entries per index = M×RF×E; Data bytes per index = Entries×(S/F); Data (all) = N×data per index; Cushion = N×H×K; Total SI = Data + Cushion; ÷ 1024³ | Collectinfo-style: M, RF, E, N, K; S, F, H = constants |
+| Total memory used base (GB) | `total_memory_used_base_gb` | Primary Index Shmem + Secondary Index Shmem (per namespace); engine sums over namespaces | Replaces previous C37; aligns with Aerospike shmem |
 | Storage utilization (%) | `storage_utilization_pct` | 100 × (data stored GB ÷ total available storage GB) | C53 = C54/C55 (as %) |
 | Memory utilization base (%) | `memory_utilization_base_pct` | 100 × (memory used base GB ÷ available mem per cluster GB) | C68 = C69/C71 |
 | Effective nodes (failure) | `effective_nodes` | Nodes per cluster − nodes lost | C70 = C6−C46 |

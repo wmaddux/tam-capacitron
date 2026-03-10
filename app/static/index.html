@@ -20,32 +20,29 @@
     .toolbar { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
     .toolbar button { padding: 0.4rem 0.75rem; background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
     .toolbar button:hover { border-color: var(--accent); }
-    .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; max-width: 1100px; }
-    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+    .layout { display: grid; grid-template-columns: 1fr 1fr minmax(220px, 280px); gap: 1rem; max-width: 1300px; }
+    @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } }
     .panel { background: var(--card); border-radius: 8px; padding: 0.75rem 1rem; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
     .panel h2 { font-size: 0.7rem; margin: 0 0 0.5rem 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
-    .input-section { margin-bottom: 0.6rem; }
-    .input-section:last-child { margin-bottom: 0; }
-    .input-section-title { font-size: 0.65rem; color: var(--text); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.3rem; padding-bottom: 0.2rem; border-bottom: 1px solid var(--border); }
+    .input-card { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.75rem; margin-bottom: 0.75rem; }
+    .input-card:last-of-type { margin-bottom: 0; }
+    .input-card-title { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem; padding-bottom: 0.15rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .input-card-title input[type="text"] { flex: 1; min-width: 0; font-size: 0.75rem; padding: 0.2rem 0.4rem; border: 1px solid var(--border); border-radius: 4px; }
+    .input-card-title .remove-ns { font-size: 0.65rem; color: var(--muted); cursor: pointer; text-decoration: none; }
+    .input-card-title .remove-ns:hover { color: var(--text); }
+    .add-namespace-wrap { margin-top: 0.5rem; }
+    .add-namespace-wrap button { padding: 0.3rem 0.6rem; font-size: 0.75rem; background: var(--card); border: 1px dashed var(--border); color: var(--muted); border-radius: 6px; cursor: pointer; }
+    .add-namespace-wrap button:hover { border-color: var(--accent); color: var(--accent); }
     .input-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; font-size: 0.78rem; }
-    .input-row label { min-width: 9rem; color: var(--muted); }
+    .input-row label { min-width: 9rem; color: var(--muted); cursor: pointer; }
+    .input-row label:hover { color: var(--accent); }
     .input-row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); max-width: 120px; }
     .input-row .value { min-width: 2.5rem; color: var(--value); font-weight: 600; text-align: right; font-size: 0.72rem; }
-    .input-row label.param-label { cursor: pointer; }
-    .input-row label.param-label:hover { color: var(--accent); }
     .input-row label.param-label.selected { color: var(--accent); font-weight: 600; }
-    .param-help { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--muted); line-height: 1.4; min-height: 2.5rem; }
-    .param-help .placeholder { font-style: italic; }
     .output-section { margin-bottom: 1rem; }
     .output-section:last-child { margin-bottom: 0; }
     .output-section-title { font-size: 0.65rem; color: var(--text); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; padding-bottom: 0.25rem; border-bottom: 1px solid var(--border); }
-    .output-card {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 0.6rem 0.75rem;
-      margin-bottom: 0.75rem;
-    }
+    .output-card { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.75rem; margin-bottom: 0.75rem; }
     .output-card:last-child { margin-bottom: 0; }
     .output-card-title { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem; padding-bottom: 0.15rem; border-bottom: 1px solid var(--border); }
     .output-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.8rem; padding: 0.2rem 0; }
@@ -55,6 +52,9 @@
     .output-row.primary .k { color: var(--text); font-weight: 600; }
     .output-row.primary .v { font-size: 1.2rem; font-weight: 700; color: var(--value); }
     .output-section-placeholder { font-size: 0.7rem; color: var(--muted); font-style: italic; padding: 0.25rem 0; }
+    .help-column { background: transparent; border: none; box-shadow: none; padding: 0.75rem 0 0 0; }
+    .param-help { font-size: 0.8rem; color: var(--muted); line-height: 1.45; }
+    .param-help .placeholder { font-style: italic; color: var(--muted); opacity: 0.8; }
   </style>
 </head>
 <body>
@@ -70,22 +70,27 @@
     <div class="panel">
       <h2>Inputs</h2>
       <div id="inputs"></div>
-      <div id="paramHelp" class="param-help"><span class="placeholder">Click a parameter name for details.</span></div>
     </div>
     <div class="panel">
       <h2>Outputs</h2>
       <div id="outputs">Loading…</div>
     </div>
+    <div class="panel help-column">
+      <div id="paramHelp" class="param-help"><span class="placeholder">Click a parameter name for details.</span></div>
+    </div>
   </div>
 
   <script>
-    const INPUT_LABELS = [
-      { key: 'replication_factor', label: 'Replication factor', log: false },
+    const CLUSTER_KEYS = [
       { key: 'nodes_per_cluster', label: 'Nodes per cluster', log: false },
       { key: 'devices_per_node', label: 'Devices per node', log: false },
       { key: 'device_size_gb', label: 'Device size (GB)', log: false },
-      { key: 'available_memory_gb', label: 'Available memory per node (GB)', log: false },
+      { key: 'available_memory_gb', label: 'Available memory/node (GB)', log: false },
       { key: 'overhead_pct', label: 'Overhead %', log: false },
+      { key: 'nodes_lost', label: 'Nodes lost (failure)', log: false },
+    ];
+    const NAMESPACE_KEYS = [
+      { key: 'replication_factor', label: 'Replication factor', log: false },
       { key: 'master_object_count', label: 'Master object count', log: true },
       { key: 'avg_record_size_bytes', label: 'Avg record size (bytes)', log: false },
       { key: 'read_pct', label: 'Read %', log: false },
@@ -93,17 +98,23 @@
       { key: 'tombstone_pct', label: 'Tombstone %', log: false },
       { key: 'si_count', label: 'SI count', log: false },
       { key: 'si_entries_per_object', label: 'SI entries per object', log: false },
-      { key: 'nodes_lost', label: 'Nodes lost (failure)', log: false },
     ];
-    let INPUT_SPEC = [];
-
-    const INPUT_SECTIONS = [
-      { title: 'Topology', keys: ['replication_factor', 'nodes_per_cluster', 'devices_per_node', 'device_size_gb'] },
-      { title: 'Server / memory', keys: ['available_memory_gb', 'overhead_pct'] },
-      { title: 'Workload', keys: ['master_object_count', 'avg_record_size_bytes', 'read_pct', 'write_pct', 'tombstone_pct', 'si_count', 'si_entries_per_object'] },
-      { title: 'Resilience', keys: ['nodes_lost'] },
-    ];
-
+    const SCHEMA_DEFAULTS = {
+      replication_factor: { min: 1, max: 4, step: 1 },
+      nodes_per_cluster: { min: 1, max: 64, step: 1 },
+      devices_per_node: { min: 1, max: 24, step: 1 },
+      device_size_gb: { min: 50, max: 4096, step: 64 },
+      available_memory_gb: { min: 16, max: 1024, step: 16 },
+      overhead_pct: { min: 0, max: 0.5, step: 0.01 },
+      master_object_count: { min: 1e4, max: 1e12, step: 1e6 },
+      avg_record_size_bytes: { min: 100, max: 1e7, step: 10000 },
+      read_pct: { min: 0, max: 1, step: 0.01 },
+      write_pct: { min: 0, max: 1, step: 0.01 },
+      tombstone_pct: { min: 0, max: 0.5, step: 0.01 },
+      si_count: { min: 0, max: 20, step: 1 },
+      si_entries_per_object: { min: 0, max: 10, step: 0.1 },
+      nodes_lost: { min: 0, max: 16, step: 1 },
+    };
     const PARAM_HELP = {
       replication_factor: 'Number of copies of each record across the cluster. Higher values improve availability but use more storage and memory.',
       nodes_per_cluster: 'Total number of nodes in the cluster. Affects total storage, memory, and device count.',
@@ -121,31 +132,13 @@
       nodes_lost: 'Number of nodes assumed lost in the failure scenario. Used to compute effective nodes and failure utilization.',
     };
 
-    let state = {};
+    let state = { cluster: {}, namespaces: [] };
+    let lastOutput = null;
 
-    const SCHEMA_DEFAULTS = {
-      replication_factor: { min: 1, max: 4, step: 1 },
-      nodes_per_cluster: { min: 1, max: 64, step: 1 },
-      devices_per_node: { min: 1, max: 24, step: 1 },
-      device_size_gb: { min: 64, max: 4096, step: 64 },
-      available_memory_gb: { min: 16, max: 1024, step: 16 },
-      overhead_pct: { min: 0, max: 0.5, step: 0.01 },
-      master_object_count: { min: 1e4, max: 1e12, step: 1e6 },
-      avg_record_size_bytes: { min: 100, max: 1e7, step: 10000 },
-      read_pct: { min: 0, max: 1, step: 0.01 },
-      write_pct: { min: 0, max: 1, step: 0.01 },
-      tombstone_pct: { min: 0, max: 0.5, step: 0.01 },
-      si_count: { min: 0, max: 20, step: 1 },
-      si_entries_per_object: { min: 0, max: 10, step: 0.1 },
-      nodes_lost: { min: 0, max: 16, step: 1 },
-    };
-    function buildInputSpec(schema) {
-      INPUT_SPEC = INPUT_LABELS.map(item => {
-        const s = schema && schema[item.key] ? schema[item.key] : SCHEMA_DEFAULTS[item.key];
-        return s ? { ...item, min: s.min, max: s.max, step: s.step } : { ...item, min: 0, max: 1, step: 0.01 };
-      });
+    function getSpec(key) {
+      const d = SCHEMA_DEFAULTS[key];
+      return d ? { min: d.min, max: d.max, step: d.step } : { min: 0, max: 1, step: 0.01 };
     }
-
     function formatLargeNumber(n) {
       const num = Number(n);
       if (num >= 1e9) return (num / 1e9).toFixed(1).replace(/\.0$/, '') + ' B';
@@ -153,7 +146,6 @@
       if (num >= 1e3) return (num / 1e3).toFixed(1).replace(/\.0$/, '') + ' K';
       return num.toLocaleString();
     }
-
     function formatNumber(val, key) {
       const n = Number(val);
       if (isNaN(n)) return '—';
@@ -163,55 +155,142 @@
       if (Number.isInteger(n)) return n;
       return n.toFixed(2);
     }
+    function formatVal(val, key, log) {
+      const n = Number(val);
+      if (isNaN(n)) return '—';
+      return log ? formatLargeNumber(n) : formatNumber(n, key);
+    }
 
-    function renderInputs(values) {
+    function defaultNamespace() {
+      const flat = { replication_factor: 2, master_object_count: 1e6, avg_record_size_bytes: 500, read_pct: 0.5, write_pct: 0.5, tombstone_pct: 0, si_count: 0, si_entries_per_object: 0 };
+      return { name: '', ...flat };
+    }
+    function defaultCluster() {
+      return { cluster_name: '', nodes_per_cluster: 3, devices_per_node: 2, device_size_gb: 50, available_memory_gb: 64, overhead_pct: 0.15, nodes_lost: 0 };
+    }
+    function flatDefaultsToState(flat) {
+      return {
+        cluster: {
+          cluster_name: '',
+          nodes_per_cluster: flat.nodes_per_cluster ?? 3,
+          devices_per_node: flat.devices_per_node ?? 2,
+          device_size_gb: flat.device_size_gb ?? 50,
+          available_memory_gb: flat.available_memory_gb ?? 64,
+          overhead_pct: flat.overhead_pct ?? 0.15,
+          nodes_lost: flat.nodes_lost ?? 0,
+        },
+        namespaces: [{
+          name: '',
+          replication_factor: flat.replication_factor ?? 2,
+          master_object_count: flat.master_object_count ?? 1e6,
+          avg_record_size_bytes: flat.avg_record_size_bytes ?? 500,
+          read_pct: flat.read_pct ?? 0.5,
+          write_pct: flat.write_pct ?? 0.5,
+          tombstone_pct: flat.tombstone_pct ?? 0,
+          si_count: flat.si_count ?? 0,
+          si_entries_per_object: flat.si_entries_per_object ?? 0,
+        }],
+      };
+    }
+
+    function renderOneRow(spec, value, nsIndex, isCluster) {
+      const s = getSpec(spec.key);
+      const v = Number(value);
+      const clamped = Math.max(s.min, Math.min(s.max, isNaN(v) ? s.min : v));
+      const disp = formatVal(clamped, spec.key, spec.log);
+      const dataNs = isCluster ? ' data-ns=""' : ` data-ns="${nsIndex}"`;
+      return `<div class="input-row">
+        <label class="param-label" data-key="${spec.key}"${dataNs} tabindex="0">${spec.label}</label>
+        <input type="range" data-key="${spec.key}"${dataNs} data-cluster="${isCluster}" min="${s.min}" max="${s.max}" step="${s.step}" value="${clamped}">
+        <span class="value" data-value="${spec.key}"${dataNs} data-cluster="${isCluster}">${disp}</span>
+      </div>`;
+    }
+
+    function renderInputs() {
       const el = document.getElementById('inputs');
-      el.innerHTML = INPUT_SECTIONS.map(section => {
-        const rows = section.keys.map(key => {
-          const spec = INPUT_SPEC.find(s => s.key === key);
-          if (!spec) return '';
-          const v = Number(values[spec.key]);
-          const clamped = Math.max(spec.min, Math.min(spec.max, isNaN(v) ? spec.min : v));
-          const disp = spec.log ? formatLargeNumber(v) : formatNumber(v, spec.key);
-          return `
-            <div class="input-row">
-              <label class="param-label" data-key="${spec.key}" tabindex="0">${spec.label}</label>
-              <input type="range" data-key="${spec.key}" min="${spec.min}" max="${spec.max}" step="${spec.step}" value="${clamped}">
-              <span class="value" data-value="${spec.key}">${disp}</span>
-            </div>
-          `;
-        }).join('');
-        return `
-          <div class="input-section">
-            <div class="input-section-title">${section.title}</div>
-            ${rows}
-          </div>
-        `;
-      }).join('');
+      const cluster = state.cluster;
+      const namespaces = state.namespaces;
 
+      let html = '<div class="input-card"><div class="input-card-title">Cluster (topology, server, resilience)</div>';
+      html += `<div class="input-row"><label>Cluster name</label><input type="text" id="clusterName" placeholder="Cluster name" value="${(cluster.cluster_name || '').replace(/"/g, '&quot;')}" style="max-width:10rem;"><span class="value"></span></div>`;
+      CLUSTER_KEYS.forEach(spec => {
+        html += renderOneRow(spec, cluster[spec.key], 0, true);
+      });
+      html += '</div>';
+
+      html += '<div class="input-card"><div class="input-card-title">Namespaces (workload)</div>';
+      namespaces.forEach((ns, idx) => {
+        html += `<div class="input-card" data-namespace-index="${idx}">`;
+        const showRemove = namespaces.length > 1;
+        html += `<div class="input-card-title">
+          <input type="text" class="ns-name" data-ns-index="${idx}" placeholder="Namespace name" value="${(ns.name || '').replace(/"/g, '&quot;')}">
+          ${showRemove ? `<a href="#" class="remove-ns" data-ns-index="${idx}" title="Remove namespace">Remove</a>` : ''}
+        </div>`;
+        NAMESPACE_KEYS.forEach(spec => {
+          html += renderOneRow(spec, ns[spec.key], idx, false);
+        });
+        html += '</div>';
+      });
+      html += '<div class="add-namespace-wrap"><button type="button" id="addNamespace">+ Add namespace</button></div>';
+      html += '</div>';
+      el.innerHTML = html;
+
+      el.querySelector('#clusterName').addEventListener('input', (e) => {
+        state.cluster.cluster_name = e.target.value;
+      });
       el.querySelectorAll('input[type="range"]').forEach(input => {
         input.addEventListener('input', () => {
           const key = input.dataset.key;
-          const spec = INPUT_SPEC.find(s => s.key === key);
+          const isCluster = input.dataset.cluster === 'true';
           const val = parseFloat(input.value);
-          state[key] = val;
-          const span = el.querySelector(`[data-value="${key}"]`);
-          span.textContent = spec.log ? formatLargeNumber(val) : formatNumber(val, spec.key);
+          if (isCluster) {
+            state.cluster[key] = val;
+          } else {
+            const idx = parseInt(input.dataset.ns, 10);
+            state.namespaces[idx][key] = val;
+          }
+          const ns = input.dataset.ns ?? '';
+          const span = el.querySelector(`[data-value="${key}"][data-ns="${ns}"][data-cluster="${input.dataset.cluster}"]`);
+          if (span) {
+            const spec = [...CLUSTER_KEYS, ...NAMESPACE_KEYS].find(s => s.key === key);
+            span.textContent = formatVal(val, key, spec && spec.log);
+          }
           compute();
         });
       });
+      el.querySelectorAll('input.ns-name').forEach(input => {
+        input.addEventListener('input', (e) => {
+          const idx = parseInt(e.target.dataset.nsIndex, 10);
+          state.namespaces[idx].name = e.target.value;
+        });
+      });
+      el.querySelectorAll('.remove-ns').forEach(a => {
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          const idx = parseInt(a.dataset.nsIndex, 10);
+          if (state.namespaces.length <= 1) return;
+          state.namespaces.splice(idx, 1);
+          renderInputs();
+          compute();
+        });
+      });
+      el.querySelector('#addNamespace').addEventListener('click', () => {
+        state.namespaces.push(defaultNamespace());
+        renderInputs();
+        compute();
+      });
 
       el.querySelectorAll('label.param-label').forEach(label => {
-        const key = label.dataset.key;
-        const showHelp = () => {
+        label.addEventListener('click', () => {
           el.querySelectorAll('label.param-label').forEach(l => l.classList.remove('selected'));
           label.classList.add('selected');
+          const key = label.dataset.key;
           const helpEl = document.getElementById('paramHelp');
-          const text = PARAM_HELP[key] || 'No description available.';
-          helpEl.innerHTML = text;
-        };
-        label.addEventListener('click', showHelp);
-        label.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showHelp(); } });
+          helpEl.innerHTML = PARAM_HELP[key] || '<span class="placeholder">No description available.</span>';
+        });
+        label.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); label.click(); }
+        });
       });
     }
 
@@ -222,13 +301,36 @@
     }
 
     async function compute() {
-      const r = await fetch('/api/compute', {
+      const body = {
+        cluster: {
+          cluster_name: state.cluster.cluster_name || '',
+          nodes_per_cluster: state.cluster.nodes_per_cluster,
+          devices_per_node: state.cluster.devices_per_node,
+          device_size_gb: state.cluster.device_size_gb,
+          available_memory_gb: state.cluster.available_memory_gb,
+          overhead_pct: state.cluster.overhead_pct,
+          nodes_lost: state.cluster.nodes_lost,
+        },
+        namespaces: state.namespaces.map(ns => ({
+          name: ns.name || '',
+          replication_factor: ns.replication_factor,
+          master_object_count: ns.master_object_count,
+          avg_record_size_bytes: ns.avg_record_size_bytes,
+          read_pct: ns.read_pct,
+          write_pct: ns.write_pct,
+          tombstone_pct: ns.tombstone_pct,
+          si_count: ns.si_count,
+          si_entries_per_object: ns.si_entries_per_object,
+        })),
+      };
+      const r = await fetch('/api/compute-v2', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(state),
+        body: JSON.stringify(body),
       });
       if (!r.ok) throw new Error(r.statusText);
       const out = await r.json();
+      lastOutput = out;
       renderOutputs(out);
       return out;
     }
@@ -239,7 +341,7 @@
     }
 
     function renderOutputs(o) {
-      const nodesLost = state.nodes_lost != null ? Math.round(state.nodes_lost) : 0;
+      const nodesLost = state.cluster && state.cluster.nodes_lost != null ? Math.round(state.cluster.nodes_lost) : 0;
       const memNote = o.memory_utilization_base_pct > 100 ? ' <span style="font-size:0.75em; color: var(--muted);">(over-subscribed)</span>' : '';
       const failMemNote = o.failure_memory_utilization_pct > 100 ? ' <span style="font-size:0.75em; color: var(--muted);">(over-subscribed)</span>' : '';
       document.getElementById('outputs').innerHTML = `
@@ -283,9 +385,9 @@
     }
 
     document.getElementById('loadDefaults').addEventListener('click', async () => {
-      const def = await fetchDefaults();
-      state = { ...def };
-      renderInputs(state);
+      const flat = await fetchDefaults();
+      state = flatDefaultsToState(flat);
+      renderInputs();
       await compute();
     });
 
@@ -301,18 +403,21 @@
       try {
         const formData = new FormData();
         formData.append('file', file);
-        const r = await fetch('/api/load-collectinfo', {
-          method: 'POST',
-          body: formData,
-        });
+        const r = await fetch('/api/load-collectinfo', { method: 'POST', body: formData });
         if (!r.ok) {
           const err = await r.json().catch(() => ({ detail: r.statusText }));
           alert(err.detail || r.statusText);
           return;
         }
-        const inputs = await r.json();
-        state = { ...inputs };
-        renderInputs(state);
+        const data = await r.json();
+        if (data.cluster && Array.isArray(data.namespaces)) {
+          state.cluster = { ...defaultCluster(), ...data.cluster, cluster_name: data.cluster.cluster_name ?? '' };
+          state.namespaces = data.namespaces.map(n => ({ ...defaultNamespace(), ...n, name: n.name ?? '' }));
+          if (state.namespaces.length === 0) state.namespaces = [defaultNamespace()];
+        } else {
+          state = flatDefaultsToState(data.legacy || data);
+        }
+        renderInputs();
         await compute();
       } catch (err) {
         alert(err.message || 'Load from collectinfo failed');
@@ -321,7 +426,7 @@
 
     document.getElementById('exportBtn').addEventListener('click', async () => {
       const out = await compute();
-      const blob = new Blob([JSON.stringify({ inputs: state, outputs: out }, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify({ cluster: state.cluster, namespaces: state.namespaces, outputs: out }, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'capacity-plan.json';
@@ -330,11 +435,9 @@
     });
 
     (async () => {
-      const schema = await fetch('/api/schema').then(r => r.ok ? r.json() : {});
-      buildInputSpec(schema);
-      const def = await fetchDefaults();
-      state = { ...def };
-      renderInputs(state);
+      const flat = await fetchDefaults();
+      state = flatDefaultsToState(flat);
+      renderInputs();
       await compute();
     })();
   </script>

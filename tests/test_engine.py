@@ -5,8 +5,14 @@ Can be extended to compare against exported values from the workbook.
 """
 
 import pytest
-from core.model import CapacityInputs, get_default_inputs
-from core.engine import run
+from core.model import (
+    CapacityInputs,
+    ClusterInputs,
+    NamespaceInputs,
+    capacity_inputs_to_cluster_and_namespaces,
+    get_default_inputs,
+)
+from core.engine import run, run_multi
 
 
 def test_run_with_defaults():
@@ -44,3 +50,89 @@ def test_run_with_workbook_like_inputs():
     assert out.effective_nodes == 6.0
     assert out.data_stored_gb > 0
     assert out.storage_utilization_pct >= 0
+
+
+def test_run_multi_one_namespace_matches_run():
+    """run_multi(cluster, [one namespace]) must match run(CapacityInputs) for same values."""
+    inp = CapacityInputs(
+        replication_factor=2.0,
+        nodes_per_cluster=5.0,
+        devices_per_node=2.0,
+        device_size_gb=512.0,
+        available_memory_gb=128.0,
+        overhead_pct=0.15,
+        master_object_count=1e9,
+        avg_record_size_bytes=1000.0,
+        read_pct=0.6,
+        write_pct=0.4,
+        tombstone_pct=0.02,
+        si_count=2.0,
+        si_entries_per_object=1.0,
+        nodes_lost=1.0,
+    )
+    out_legacy = run(inp)
+    cluster, namespaces = capacity_inputs_to_cluster_and_namespaces(inp)
+    out_multi = run_multi(cluster, namespaces)
+    assert out_multi.device_total_storage_tb == out_legacy.device_total_storage_tb
+    assert out_multi.total_device_count == out_legacy.total_device_count
+    assert out_multi.data_stored_gb == out_legacy.data_stored_gb
+    assert out_multi.storage_utilization_pct == out_legacy.storage_utilization_pct
+    assert out_multi.available_mem_per_cluster_gb == out_legacy.available_mem_per_cluster_gb
+    assert out_multi.total_memory_used_base_gb == out_legacy.total_memory_used_base_gb
+    assert out_multi.memory_utilization_base_pct == out_legacy.memory_utilization_base_pct
+    assert out_multi.effective_nodes == out_legacy.effective_nodes
+    assert out_multi.failure_storage_utilization_pct == out_legacy.failure_storage_utilization_pct
+    assert out_multi.failure_memory_utilization_pct == out_legacy.failure_memory_utilization_pct
+
+
+def test_run_multi_two_namespaces_aggregated():
+    """Two namespaces: data_stored and memory_used are sums; utilization from totals."""
+    cluster = ClusterInputs(
+        nodes_per_cluster=4.0,
+        devices_per_node=2.0,
+        device_size_gb=256.0,
+        available_memory_gb=64.0,
+        overhead_pct=0.15,
+        nodes_lost=0.0,
+    )
+    ns1 = NamespaceInputs(
+        name="ns1",
+        replication_factor=2.0,
+        master_object_count=1e6,
+        avg_record_size_bytes=500.0,
+        read_pct=0.5,
+        write_pct=0.5,
+        tombstone_pct=0.0,
+        si_count=0.0,
+        si_entries_per_object=0.0,
+    )
+    ns2 = NamespaceInputs(
+        name="ns2",
+        replication_factor=2.0,
+        master_object_count=2e6,
+        avg_record_size_bytes=300.0,
+        read_pct=0.5,
+        write_pct=0.5,
+        tombstone_pct=0.0,
+        si_count=0.0,
+        si_entries_per_object=0.0,
+    )
+    out = run_multi(cluster, [ns1, ns2])
+    # Single-namespace data: ns1 ~ (1e6*2*500)/1024^3, ns2 ~ (2e6*2*300)/1024^3
+    out_ns1_only = run_multi(cluster, [ns1])
+    out_ns2_only = run_multi(cluster, [ns2])
+    expected_data_gb = out_ns1_only.data_stored_gb + out_ns2_only.data_stored_gb
+    expected_memory_gb = out_ns1_only.total_memory_used_base_gb + out_ns2_only.total_memory_used_base_gb
+    assert out.data_stored_gb == pytest.approx(expected_data_gb, rel=1e-9)
+    assert out.total_memory_used_base_gb == pytest.approx(expected_memory_gb, rel=1e-9)
+    assert out.storage_utilization_pct >= out_ns1_only.storage_utilization_pct
+    assert out.storage_utilization_pct >= out_ns2_only.storage_utilization_pct
+    assert out.device_total_storage_tb == out_ns1_only.device_total_storage_tb
+    assert out.available_mem_per_cluster_gb == out_ns1_only.available_mem_per_cluster_gb
+
+
+def test_run_multi_empty_namespaces_raises():
+    """run_multi requires at least one namespace."""
+    cluster = ClusterInputs(nodes_per_cluster=3.0)
+    with pytest.raises(ValueError, match="At least one namespace"):
+        run_multi(cluster, [])

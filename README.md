@@ -2,7 +2,7 @@
 
 Dynamic Aerospike capacity planning tool: experiment with inputs (topology, workload, resilience) and see utilization and performance estimates in real time. Load inputs from manual entry, defaults, or a collectinfo bundle; export configurations for sharing.
 
-**Scope:** One namespace, one cluster (multiple namespaces planned). **Stack:** Web UI (HTML/JS) + Python backend (FastAPI).
+**Scope:** Multi-namespace supported (cluster + namespaces; Add/Remove namespace in UI). **Stack:** Web UI (HTML/JS) + Python backend (FastAPI).
 
 ## Requirements
 
@@ -48,7 +48,11 @@ PYTHONPATH=. python -m pytest tests/ -v
 
 ## Documentation
 
+- [MANIFEST.md](MANIFEST.md) – **Start here for new agents:** repo map, key code, how to run, scope.
+- [docs/SESSION_LOG.md](docs/SESSION_LOG.md) – Per-session work log.
 - [docs/COLLECTINFO_INPUT_MAPPING.md](docs/COLLECTINFO_INPUT_MAPPING.md) – How Load from collectinfo maps bundle data to inputs.
+- [docs/API_MULTI_NAMESPACE.md](docs/API_MULTI_NAMESPACE.md) – Multi-namespace API (POST /api/compute-v2).
+- [docs/CALCULATION_CATALOG.md](docs/CALCULATION_CATALOG.md) – All calculations (Primary/SI memory, storage, utilization).
 - [PLAN.md](PLAN.md) – Design, scope, and roadmap.
 
 Contributors: see [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming and push workflow.

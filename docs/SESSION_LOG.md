@@ -21,6 +21,13 @@ Copy this block when adding a new session; fill and paste above the "---" under 
 
 ## Recent sessions
 
+### 2025-02-27 Phase 2 UI, memory formulas, docs, push
+
+- **Summary:** Implemented Phase 2 UI with multi-namespace (three-column layout: Inputs | Outputs | Definition; Cluster card + Namespaces cards with Add/Remove; compute-v2, Load from defaults/collectinfo, Export). Fixed Total memory used base (GB) to equal Primary Index Shmem (64 bytes per replicated object) + Secondary Index Shmem (collectinfo-style: entries = M×RF×E, data + cushion). Set device size default/min to 50 GB. Updated MANIFEST, SESSION_LOG, README, and PLAN for new-agent onboarding; pushed to GitHub.
+- **Files changed/created:** `app/static/index.html` (Phase 2 UI), `core/formulas.py` (primary_index_shmem_gb, secondary_index_shmem_gb, total_memory_used_base_gb), `core/engine.py` (wire new memory calc), `docs/CALCULATION_CATALOG.md` (Primary/SI/Total memory), `core/model.py` and `app/main.py` (device_size_gb 50), `MANIFEST.md`, `README.md`, `PLAN.md` (scope/state), `docs/SESSION_LOG.md`.
+- **Decisions / notes:** Total memory = Primary (RF×M×64) + SI (M×RF×E, S/F, N×H×K). Constants: SI_ENTRY_SIZE_BYTES=32, SI_FILL_FACTOR=0.75, SI_CUSHION_PER_INDEX_PER_NODE_BYTES≈40 MiB. UI uses POST /api/compute-v2 and cluster + namespaces state; Load from collectinfo uses data.cluster and data.namespaces.
+- **Follow-ups:** Optional: expose Primary/SI breakdown in UI or export; tune SI constants from real collectinfo if needed.
+
 ### 2025-02-27 Scope, manifest, session log
 
 - **Summary:** Documented current scope (one namespace, one cluster; future multi-namespace). Created MANIFEST.md for new-agent onboarding and docs/SESSION_LOG.md for per-session work tracking.

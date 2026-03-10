@@ -21,6 +21,13 @@ When implementing multiple namespaces, the following computational changes apply
 - **API:** Request body includes cluster-level fields and `namespaces: [{ name, replication_factor, ... }, ...]`. Response keeps aggregated outputs (same as current CapacityOutputs); optionally add per-namespace breakdown later.
 - **Ingest (Load from collectinfo):** Return cluster-level fields plus a **list of namespace workload dicts** (one per namespace row in asadm summary) so the UI can pre-fill multiple Namespace cards from one bundle.
 
+## Current implementation state (for new agents)
+
+- **Multi-namespace:** Implemented. Engine `run_multi(cluster, namespaces)`; API **POST /api/compute-v2**; ingest returns `cluster` + `namespaces`. See [docs/API_MULTI_NAMESPACE.md](docs/API_MULTI_NAMESPACE.md).
+- **Phase 2 UI:** Three-column layout (Inputs | Outputs | Definition), Cluster card, Namespaces cards with Add/Remove, param help in Definition column. State is `{ cluster, namespaces[] }`. Load from defaults, Load from collectinfo, Export. See [MANIFEST.md](MANIFEST.md) and [app/static/index.html](app/static/index.html).
+- **Memory formula:** Total memory used base = **Primary Index Shmem** (64 bytes per replicated object) + **Secondary Index Shmem** (collectinfo-style: entries = M×RF×E, data + cushion). See [docs/CALCULATION_CATALOG.md](docs/CALCULATION_CATALOG.md) and `core/formulas.py`.
+- **Run:** `PYTHONPATH=. uvicorn app.main:app --reload` then http://127.0.0.1:8000. Tests: `PYTHONPATH=. python -m pytest tests/ -v`.
+
 ## Current state (from workbooks)
 
 - **Capacity_planner_v3.0-fidelity_workbench.xlsx** provides the formula source: [worksheetManual](Capacity_planner_v3.0-fidelity_workbench.xlsx) + [calcManual](Capacity_planner_v3.0-fidelity_workbench.xlsx) define inputs and calculations; [worksheetcollectinfo](Capacity_planner_v3.0-fidelity_workbench.xlsx) / [calccollectinfo](Capacity_planner_v3.0-fidelity_workbench.xlsx) show the same metrics when inputs come from a collectinfo file. The workbook's **Compare** tab side-by-sides two runs (e.g. `=calcManual!C85` vs `=calcManual!G85`); in the tool, comparison will be **saved state vs saved state** (or current), not "manual vs collectinfo" as separate modes.
