@@ -21,6 +21,13 @@ Copy this block when adding a new session; fill and paste above the "---" under 
 
 ## Recent sessions
 
+### 2025-02-27 Mockup UI restore, xlsx removal, docs for resume
+
+- **Summary:** Restored full mockup UI to app/static/index.html after work was lost during a git history rewrite (stash lost). Re-implemented: combined mockup layout (cluster default storage pattern; per-namespace storage pattern pills, Custom placement, compression, capacity thresholds); column 3 Parameter help + Show my work panel with storage utilization step-by-step; "By pattern" breakdown in outputs; Data growth and Performance output cards; Load from collectinfo "Loading…" button state. Removed Capacity_planner_v3.0-fidelity_workbench.xlsx from repo and full git history (filter-branch). Updated MANIFEST.md, README.md, and SESSION_LOG.md so another agent can resume.
+- **Files changed/created:** `app/static/index.html` (restored mockup UI, Show my work, Loading indicator, namespace pattern/compression/thresholds), `MANIFEST.md` (current scope, UI reference, workbook row), `README.md` (scope and Load from collectinfo note), `docs/SESSION_LOG.md` (this entry). Git history: xlsx file removed from all commits.
+- **Decisions / notes:** UI state includes default_storage_pattern, and per-namespace storage_pattern, placement, compression, stop_writes_at_storage_pct, evict_at_memory_pct, min_available_storage_pct; export/load merge these. Engine and API request body unchanged (new fields optional). Show my work uses STORAGE_OVERHEAD_PCT = 0.024 (matches formulas.py fragmentation factor). When adding a namespace, defaultNamespace(state.cluster.default_storage_pattern) is used.
+- **Follow-ups:** Optional: add optional API fields for new UI inputs when engine supports them; wire Data growth/Performance when backend provides data; add more "Show my work" sections (e.g. memory utilization).
+
 ### 2025-02-27 Phase 2 UI, memory formulas, docs, push
 
 - **Summary:** Implemented Phase 2 UI with multi-namespace (three-column layout: Inputs | Outputs | Definition; Cluster card + Namespaces cards with Add/Remove; compute-v2, Load from defaults/collectinfo, Export). Fixed Total memory used base (GB) to equal Primary Index Shmem (64 bytes per replicated object) + Secondary Index Shmem (collectinfo-style: entries = M×RF×E, data + cushion). Set device size default/min to 50 GB. Updated MANIFEST, SESSION_LOG, README, and PLAN for new-agent onboarding; pushed to GitHub.

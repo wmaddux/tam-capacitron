@@ -3,8 +3,8 @@
 All capacity calculations implemented in this application are derived from two spreadsheets. This catalog is the **mapping reference** from spreadsheet cells to application logic. Cell references are used here only for audit and traceability; they do not appear in application code.
 
 **Sources:**
-- **Capacity_planner_v3.0-fidelity_workbench.xlsx** – calcManual, worksheetManual, Advanced settings
-- **Tool_Aerospike_Sizing_Estimator_(10_14).xlsx** – Workload, AWS, Custom, Miscellaneous (future use)
+- **Capacity_planner (fidelity workbench)** – calcManual, worksheetManual, Advanced settings (workbook no longer in repo; mapping preserved below for traceability).
+- **Tool_Aerospike_Sizing_Estimator_(10_14).xlsx** – In repo root when present. Workload, AWS, Custom, Miscellaneous (future use).
 
 ---
 

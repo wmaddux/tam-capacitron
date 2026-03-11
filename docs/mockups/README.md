@@ -2,7 +2,7 @@
 
 Standalone HTML mockups for the **full capacity planning page** (inputs and outputs) so you can compare layout and prioritization before changing the real app.
 
-**Chosen wireframe for the project:** **[mockup-cluster-namespace-split-with-definition.html](mockup-cluster-namespace-split-with-definition.html)**. UI implementation (e.g. `app/static/index.html`) should follow this mockup: three columns (Inputs | Outputs | Definition), Cluster card with cluster name and topology/server/resilience, Namespaces (workload) card with per-namespace cards and "+ Add namespace", and parameter help on label click in the Definition column. See [docs/STRAWMAN_UI_AND_FLOW.md](../STRAWMAN_UI_AND_FLOW.md) for a short description. See **[OUTPUT_ORGANIZATION.md](OUTPUT_ORGANIZATION.md)** for how outputs are grouped and why failure shows both Storage and Memory utilization.
+**Base wireframe:** **[mockup-cluster-namespace-split-with-definition.html](mockup-cluster-namespace-split-with-definition.html)** (three columns: Inputs | Outputs | Definition; Cluster + Namespaces cards; parameter help on label click). The **live app** ([app/static/index.html](../../app/static/index.html)) extends this with: cluster default storage pattern; per-namespace storage pattern (HMA/In-Memory/All Flash/DMD/Custom), Custom placement, compression, capacity thresholds; column 3 **Show my work** panel (step-by-step storage utilization); Data growth and Performance output cards; Load from collectinfo "Loading…" state. For current UI scope and file map, see **[MANIFEST.md](../../MANIFEST.md)**. See [docs/STRAWMAN_UI_AND_FLOW.md](../STRAWMAN_UI_AND_FLOW.md) for flow. See **[OUTPUT_ORGANIZATION.md](OUTPUT_ORGANIZATION.md)** for how outputs are grouped.
 
 ## How to view
 
@@ -45,4 +45,4 @@ Same content and section structure (Healthy cluster, Failure, Data growth, Perfo
 
 ## Applying the chosen wireframe
 
-The project wireframe is **mockup-cluster-namespace-split-with-definition.html**. When updating the real app (`app/static/index.html`), apply this mockup’s three-column layout (Inputs | Outputs | Definition), Cluster + Namespaces input structure, Definition column (parameter help on label click), output cards, and light theme (see [STRAWMAN_UI_AND_FLOW.md](../STRAWMAN_UI_AND_FLOW.md)).
+The base wireframe is **mockup-cluster-namespace-split-with-definition.html**. The real app (`app/static/index.html`) uses this layout and adds storage patterns, Show my work, and related UI (see [MANIFEST.md](../../MANIFEST.md) for current scope). When changing the app, keep the mockup’s three-column layout (Inputs | Outputs | Definition), Cluster + Namespaces input structure, Parameter help + Show my work column, output cards, and light theme (see [STRAWMAN_UI_AND_FLOW.md](../STRAWMAN_UI_AND_FLOW.md)).

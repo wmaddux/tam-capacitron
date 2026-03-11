@@ -2,7 +2,7 @@
 
 Dynamic Aerospike capacity planning tool: experiment with inputs (topology, workload, resilience) and see utilization and performance estimates in real time. Load inputs from manual entry, defaults, or a collectinfo bundle; export configurations for sharing.
 
-**Scope:** Multi-namespace supported (cluster + namespaces; Add/Remove namespace in UI). **Stack:** Web UI (HTML/JS) + Python backend (FastAPI).
+**Scope:** Multi-namespace supported (cluster + namespaces; Add/Remove namespace in UI). Cluster has a default storage pattern; each namespace has storage pattern (HMA, In-Memory, All Flash, DMD, Custom), compression, and capacity thresholds. Column 3: **Parameter help** (click a parameter label) and **Show my work** (step-by-step storage utilization). **Stack:** Web UI (HTML/JS) + Python backend (FastAPI).
 
 ## Requirements
 
@@ -34,7 +34,7 @@ Then open **http://127.0.0.1:8000** in a browser.
 
 - **Inputs:** Use sliders to change topology, memory, workload, and resilience; outputs update immediately.
 - **Load from defaults:** Resets all inputs to safe minimums and refreshes outputs.
-- **Load from collectinfo:** Upload a bundle (zip) or a collectinfo file. For zip bundles the app uses **asadm** to parse; asadm must be on PATH. Optional: set **`CAPACITRON_NAMESPACE`** to choose a namespace when the bundle has multiple. See [docs/COLLECTINFO_INPUT_MAPPING.md](docs/COLLECTINFO_INPUT_MAPPING.md).
+- **Load from collectinfo:** Upload a bundle (zip) or a collectinfo file; the button shows "Loading…" while the request runs. For zip bundles the app uses **asadm** to parse; asadm must be on PATH. Optional: set **`CAPACITRON_NAMESPACE`** to choose a namespace when the bundle has multiple. See [docs/COLLECTINFO_INPUT_MAPPING.md](docs/COLLECTINFO_INPUT_MAPPING.md).
 - **Export:** Downloads a JSON file with all current inputs and outputs (standard output format) for storage or sharing.
 
 ## Run tests
