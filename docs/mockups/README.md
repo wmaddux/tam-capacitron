@@ -40,7 +40,8 @@ Same content and section structure (Healthy cluster, Failure, Data growth, Perfo
 ## Cluster vs namespace (future multi-namespace)
 
 - **[mockup-cluster-namespace-split.html](mockup-cluster-namespace-split.html)** – Wireframe that separates **cluster-wide** parameters (topology, server/memory, resilience) from **namespace-specific** parameters (workload). Includes namespace cards with Add/Remove and "+ Add namespace".
-- **[mockup-cluster-namespace-split-with-definition.html](mockup-cluster-namespace-split-with-definition.html)** – **Chosen wireframe.** Same as above with a **Definition** panel on the right. Clicking a parameter label shows its definition in this third column.
+- **[mockup-cluster-namespace-split-with-definition.html](mockup-cluster-namespace-split-with-definition.html)** – **Base wireframe.** Same as above with a **Definition** panel on the right. Clicking a parameter label shows its definition in this third column.
+- **[mockup-capacity-combined.html](mockup-capacity-combined.html)** – **Current app reference.** Static mockup matching app/static/index.html: cluster default storage pattern, per-namespace storage pattern pills (HMA/In-Memory/All Flash/DMD/Custom), compression, capacity thresholds, Parameter help + Show my work panels, By pattern breakdown, Data growth and Performance output cards. Use for project context.
 - **[CLUSTER_VS_NAMESPACE_WIREFRAME.md](CLUSTER_VS_NAMESPACE_WIREFRAME.md)** – Table of cluster-wide vs namespace-specific parameters and reference to the Workload sheet in Tool_Aerospike_Sizing_Estimator.
 
 ## Applying the chosen wireframe
