@@ -20,7 +20,7 @@
     .toolbar { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
     .toolbar button { padding: 0.4rem 0.75rem; background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
     .toolbar button:hover { border-color: var(--accent); }
-    .layout { display: grid; grid-template-columns: 1fr 1fr minmax(220px, 280px); gap: 1rem; max-width: 1300px; }
+    .layout { display: grid; grid-template-columns: 1fr 1fr minmax(660px, 840px); gap: 1rem; max-width: 2200px; }
     @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } }
     .panel { background: var(--card); border-radius: 8px; padding: 0.75rem 1rem; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
     .panel h2 { font-size: 0.7rem; margin: 0 0 0.5rem 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
@@ -39,6 +39,26 @@
     .input-row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); max-width: 120px; }
     .input-row .value { min-width: 2.5rem; color: var(--value); font-weight: 600; text-align: right; font-size: 0.72rem; }
     .input-row label.param-label.selected { color: var(--accent); font-weight: 600; }
+    .input-row select { padding: 0.2rem 0.4rem; font-size: 0.75rem; border: 1px solid var(--border); border-radius: 4px; min-width: 7rem; }
+    .default-pattern-hint { font-size: 0.68rem; color: var(--muted); margin-top: 0.2rem; margin-bottom: 0.6rem; }
+    .pattern-row { margin-bottom: 0.5rem; }
+    .pattern-row label { display: block; font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.25rem; }
+    .pattern-pills { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .pattern-pills button { padding: 0.35rem 0.6rem; font-size: 0.7rem; background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 6px; cursor: pointer; }
+    .pattern-pills button:hover { border-color: var(--accent); }
+    .pattern-pills button.selected { background: var(--accent); color: white; border-color: var(--accent); }
+    .pattern-pill.selected { background: var(--accent); color: white; border-color: var(--accent); }
+    .pattern-code { font-size: 0.7rem; color: var(--muted); margin-top: 0.25rem; }
+    .placement-custom { background: #f8fafc; border: 1px dashed var(--border); border-radius: 6px; padding: 0.5rem 0.6rem; margin-top: 0.35rem; }
+    .placement-custom .heading { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem; }
+    .placement-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem; font-size: 0.78rem; }
+    .placement-row label { min-width: 6rem; color: var(--muted); }
+    .placement-row select { padding: 0.2rem 0.4rem; font-size: 0.75rem; border: 1px solid var(--border); border-radius: 4px; min-width: 5rem; }
+    .placement-code { font-size: 0.75rem; font-weight: 600; color: var(--value); margin-top: 0.35rem; }
+    .thresholds-block { background: #f8fafc; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.6rem; margin-top: 0.4rem; }
+    .thresholds-block .heading { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem; }
+    .threshold-hint { font-size: 0.68rem; color: var(--muted); margin-top: 0.25rem; line-height: 1.35; }
+    .compression-hint { font-size: 0.68rem; color: var(--muted); margin-top: 0.2rem; }
     .output-section { margin-bottom: 1rem; }
     .output-section:last-child { margin-bottom: 0; }
     .output-section-title { font-size: 0.65rem; color: var(--text); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; padding-bottom: 0.25rem; border-bottom: 1px solid var(--border); }
@@ -52,9 +72,19 @@
     .output-row.primary .k { color: var(--text); font-weight: 600; }
     .output-row.primary .v { font-size: 1.2rem; font-weight: 700; color: var(--value); }
     .output-section-placeholder { font-size: 0.7rem; color: var(--muted); font-style: italic; padding: 0.25rem 0; }
-    .help-column { background: transparent; border: none; box-shadow: none; padding: 0.75rem 0 0 0; }
+    .breakdown { font-size: 0.72rem; color: var(--muted); line-height: 1.4; margin-top: 0.5rem; padding: 0.4rem 0.5rem; background: #f8fafc; border-radius: 6px; border-left: 3px solid var(--accent); }
+    .help-column { background: transparent; border: none; box-shadow: none; padding: 0.75rem 0 0 0; display: flex; flex-direction: column; gap: 1rem; }
+    .param-help-panel,
+    .show-my-work-panel { background: rgba(255,255,255,0.5); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; opacity: 0.75; }
+    .param-help-panel h3,
+    .show-my-work-panel h3 { font-size: 0.65rem; margin: 0 0 0.35rem 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
     .param-help { font-size: 0.8rem; color: var(--muted); line-height: 1.45; }
-    .param-help .placeholder { font-style: italic; color: var(--muted); opacity: 0.8; }
+    .param-help .placeholder { font-style: italic; color: var(--muted); opacity: 0.85; }
+    .show-my-work-panel .placeholder { font-size: 0.78rem; color: var(--muted); font-style: italic; line-height: 1.4; opacity: 0.85; }
+    .show-my-work-section { font-size: 0.78rem; line-height: 1.5; color: var(--text); }
+    .show-my-work-section strong { display: block; margin-bottom: 0.35rem; color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .show-my-work-line { margin-bottom: 0.4rem; word-break: break-word; }
+    .show-my-work-var { font-weight: 600; }
   </style>
 </head>
 <body>
@@ -76,7 +106,14 @@
       <div id="outputs">Loading…</div>
     </div>
     <div class="panel help-column">
-      <div id="paramHelp" class="param-help"><span class="placeholder">Click a parameter name for details.</span></div>
+      <div class="param-help-panel">
+        <h3>Parameter help</h3>
+        <div id="paramHelp" class="param-help"><span class="placeholder">Click a parameter name for details.</span></div>
+      </div>
+      <div class="show-my-work-panel">
+        <h3>Show my work</h3>
+        <div id="showMyWorkContent" class="placeholder">Step-by-step and derived values will appear here.</div>
+      </div>
     </div>
   </div>
 
@@ -130,7 +167,47 @@
       si_count: 'Number of secondary indexes on the namespace. Each index adds memory and storage overhead.',
       si_entries_per_object: 'Average secondary index entries per object. With SI count, affects memory and storage for indexes.',
       nodes_lost: 'Number of nodes assumed lost in the failure scenario. Used to compute effective nodes and failure utilization.',
+      default_storage_pattern: 'New namespaces inherit this pattern (HMA, In-Memory, All Flash, DMD) until overridden per namespace.',
     };
+
+    const STORAGE_PATTERNS = [
+      { value: 'HMA (MMD)', code: 'MMD', desc: 'Primary & SI in RAM, data on flash.' },
+      { value: 'In-Memory (MMM)', code: 'MMM', desc: 'Index and data both in DRAM.' },
+      { value: 'All Flash (DDD)', code: 'DDD', desc: 'Primary, SI, and data on flash. Maximum RAM savings.' },
+      { value: 'DMD', code: 'DMD', desc: 'Primary on disk, SI in memory, data on disk.' },
+      { value: 'Custom', code: null, desc: null },
+    ];
+    function placementFromPattern(pattern) {
+      if (pattern === 'HMA (MMD)') return { primary: 'M', si: 'M', data: 'D' };
+      if (pattern === 'In-Memory (MMM)') return { primary: 'M', si: 'M', data: 'M' };
+      if (pattern === 'All Flash (DDD)') return { primary: 'D', si: 'D', data: 'D' };
+      if (pattern === 'DMD') return { primary: 'D', si: 'M', data: 'D' };
+      return { primary: 'M', si: 'M', data: 'D' };
+    }
+    function placementToCode(p) {
+      return (p.primary || 'M')[0] + (p.si || 'M')[0] + (p.data || 'D')[0];
+    }
+    function namespaceUsesPlacement(ns) {
+      const p = ns.placement || placementFromPattern(ns.storage_pattern);
+      if (!p) return { usesRam: false, usesDevice: false };
+      const usesRam = p.primary === 'M' || p.si === 'M' || p.data === 'M';
+      const usesDevice = p.primary === 'D' || p.si === 'D' || p.data === 'D';
+      return { usesRam, usesDevice };
+    }
+    function buildBreakdownText(namespaces) {
+      if (!namespaces || !namespaces.length) return 'Memory — 0 namespaces use RAM. Storage — 0 namespaces use device.';
+      const ramNames = [];
+      const deviceNames = [];
+      namespaces.forEach(ns => {
+        const { usesRam, usesDevice } = namespaceUsesPlacement(ns);
+        const name = (ns.name || 'ns').trim() || 'ns';
+        if (usesRam) ramNames.push(name);
+        if (usesDevice) deviceNames.push(name);
+      });
+      const ramPart = 'Memory — ' + ramNames.length + ' namespace(s) use RAM' + (ramNames.length ? ' (' + ramNames.join(', ') + ')' : '') + '.';
+      const storagePart = 'Storage — ' + deviceNames.length + ' namespace(s) use device' + (deviceNames.length ? ' (' + deviceNames.join(', ') + ')' : '') + '.';
+      return ramPart + ' ' + storagePart;
+    }
 
     let state = { cluster: {}, namespaces: [] };
     let lastOutput = null;
@@ -161,17 +238,28 @@
       return log ? formatLargeNumber(n) : formatNumber(n, key);
     }
 
-    function defaultNamespace() {
+    function defaultNamespace(defaultPattern) {
+      const pattern = defaultPattern || 'HMA (MMD)';
       const flat = { replication_factor: 2, master_object_count: 1e6, avg_record_size_bytes: 500, read_pct: 0.5, write_pct: 0.5, tombstone_pct: 0, si_count: 0, si_entries_per_object: 0 };
-      return { name: '', ...flat };
+      return {
+        name: '',
+        ...flat,
+        storage_pattern: pattern,
+        placement: placementFromPattern(pattern),
+        compression: 'Off',
+        stop_writes_at_storage_pct: 90,
+        evict_at_memory_pct: 95,
+        min_available_storage_pct: 5,
+      };
     }
     function defaultCluster() {
-      return { cluster_name: '', nodes_per_cluster: 3, devices_per_node: 2, device_size_gb: 50, available_memory_gb: 64, overhead_pct: 0.15, nodes_lost: 0 };
+      return { cluster_name: '', default_storage_pattern: 'HMA (MMD)', nodes_per_cluster: 3, devices_per_node: 2, device_size_gb: 50, available_memory_gb: 64, overhead_pct: 0.15, nodes_lost: 0 };
     }
     function flatDefaultsToState(flat) {
       return {
         cluster: {
           cluster_name: '',
+          default_storage_pattern: flat.default_storage_pattern ?? 'HMA (MMD)',
           nodes_per_cluster: flat.nodes_per_cluster ?? 3,
           devices_per_node: flat.devices_per_node ?? 2,
           device_size_gb: flat.device_size_gb ?? 50,
@@ -189,6 +277,12 @@
           tombstone_pct: flat.tombstone_pct ?? 0,
           si_count: flat.si_count ?? 0,
           si_entries_per_object: flat.si_entries_per_object ?? 0,
+          storage_pattern: flat.storage_pattern ?? 'HMA (MMD)',
+          placement: flat.placement ?? placementFromPattern(flat.storage_pattern || 'HMA (MMD)'),
+          compression: flat.compression ?? 'Off',
+          stop_writes_at_storage_pct: flat.stop_writes_at_storage_pct ?? 90,
+          evict_at_memory_pct: flat.evict_at_memory_pct ?? 95,
+          min_available_storage_pct: flat.min_available_storage_pct ?? 5,
         }],
       };
     }
@@ -213,6 +307,18 @@
 
       let html = '<div class="input-card"><div class="input-card-title">Cluster (topology, server, resilience)</div>';
       html += `<div class="input-row"><label>Cluster name</label><input type="text" id="clusterName" placeholder="Cluster name" value="${(cluster.cluster_name || '').replace(/"/g, '&quot;')}" style="max-width:10rem;"><span class="value"></span></div>`;
+      const defaultPattern = cluster.default_storage_pattern || 'HMA (MMD)';
+      html += `<div class="input-row">
+        <label class="param-label" data-key="default_storage_pattern">Default storage pattern</label>
+        <select id="defaultStoragePattern">
+          <option value="HMA (MMD)" ${defaultPattern === 'HMA (MMD)' ? 'selected' : ''}>HMA (MMD)</option>
+          <option value="In-Memory (MMM)" ${defaultPattern === 'In-Memory (MMM)' ? 'selected' : ''}>In-Memory (MMM)</option>
+          <option value="All Flash (DDD)" ${defaultPattern === 'All Flash (DDD)' ? 'selected' : ''}>All Flash (DDD)</option>
+          <option value="DMD" ${defaultPattern === 'DMD' ? 'selected' : ''}>DMD</option>
+        </select>
+        <span class="value"></span>
+      </div>`;
+      html += '<div class="default-pattern-hint">New namespaces use this until overridden.</div>';
       CLUSTER_KEYS.forEach(spec => {
         html += renderOneRow(spec, cluster[spec.key], 0, true);
       });
@@ -220,15 +326,52 @@
 
       html += '<div class="input-card"><div class="input-card-title">Namespaces (workload)</div>';
       namespaces.forEach((ns, idx) => {
+        const pattern = ns.storage_pattern ?? 'HMA (MMD)';
+        const isCustom = pattern === 'Custom';
+        const placement = ns.placement || placementFromPattern(pattern);
+        const code = placementToCode(placement);
+        const comp = ns.compression ?? 'Off';
+        const stopWrites = ns.stop_writes_at_storage_pct ?? 90;
+        const evictAt = ns.evict_at_memory_pct ?? 95;
+        const minAvail = ns.min_available_storage_pct ?? 5;
         html += `<div class="input-card" data-namespace-index="${idx}">`;
         const showRemove = namespaces.length > 1;
         html += `<div class="input-card-title">
           <input type="text" class="ns-name" data-ns-index="${idx}" placeholder="Namespace name" value="${(ns.name || '').replace(/"/g, '&quot;')}">
           ${showRemove ? `<a href="#" class="remove-ns" data-ns-index="${idx}" title="Remove namespace">Remove</a>` : ''}
         </div>`;
+        html += '<div class="pattern-row"><label>Storage pattern</label><div class="pattern-pills">';
+        STORAGE_PATTERNS.forEach(p => {
+          const sel = p.value === pattern ? ' selected' : '';
+          html += `<button type="button" class="pattern-pill${sel}" data-ns-index="${idx}" data-pattern="${String(p.value).replace(/"/g, '&quot;')}">${p.value}</button>`;
+        });
+        html += '</div>';
+        if (!isCustom) {
+          const info = STORAGE_PATTERNS.find(x => x.value === pattern);
+          if (info && info.code) html += `<div class="pattern-code">${info.code} — ${info.desc}</div>`;
+        }
+        if (isCustom) {
+          html += `<div class="placement-custom">
+            <div class="heading">Index / data placement</div>
+            <div class="placement-row"><label>Primary index</label><select class="placement-select" data-ns-index="${idx}" data-slot="primary"><option value="M" ${placement.primary === 'M' ? 'selected' : ''}>Memory</option><option value="D" ${placement.primary === 'D' ? 'selected' : ''}>Disk</option></select></div>
+            <div class="placement-row"><label>Secondary index</label><select class="placement-select" data-ns-index="${idx}" data-slot="si"><option value="M" ${placement.si === 'M' ? 'selected' : ''}>Memory</option><option value="D" ${placement.si === 'D' ? 'selected' : ''}>Disk</option></select></div>
+            <div class="placement-row"><label>Data</label><select class="placement-select" data-ns-index="${idx}" data-slot="data"><option value="M" ${placement.data === 'M' ? 'selected' : ''}>Memory</option><option value="D" ${placement.data === 'D' ? 'selected' : ''}>Disk</option></select></div>
+            <div class="placement-code">Code: ${code} — Primary ${placement.primary === 'M' ? 'in memory' : 'on disk'}, SI ${placement.si === 'M' ? 'in memory' : 'on disk'}, data ${placement.data === 'M' ? 'in memory' : 'on disk'}</div>
+          </div>`;
+        }
+        html += '</div>';
+        html += `<div class="input-row"><label class="param-label" data-key="compression">Compression</label><select class="ns-compression" data-ns-index="${idx}"><option value="Off" ${comp === 'Off' ? 'selected' : ''}>Off</option><option value="LZ4" ${comp === 'LZ4' ? 'selected' : ''}>LZ4</option><option value="Zstandard" ${comp === 'Zstandard' ? 'selected' : ''}>Zstandard</option></select><span class="value"></span></div>`;
+        html += '<div class="compression-hint">Data on device is compressed; effective storage capacity increases. May increase CPU use.</div>';
         NAMESPACE_KEYS.forEach(spec => {
           html += renderOneRow(spec, ns[spec.key], idx, false);
         });
+        html += `<div class="thresholds-block">
+          <div class="heading">Capacity thresholds</div>
+          <div class="input-row"><label>Stop-writes at storage %</label><input type="range" class="threshold-slider" data-ns-index="${idx}" data-key="stop_writes_at_storage_pct" min="0" max="100" value="${stopWrites}" step="1"><span class="value">${stopWrites}%</span></div>
+          <div class="input-row"><label>Evict at memory %</label><input type="range" class="threshold-slider" data-ns-index="${idx}" data-key="evict_at_memory_pct" min="0" max="100" value="${evictAt}" step="1"><span class="value">${evictAt}%</span></div>
+          <div class="input-row"><label>Min available storage %</label><input type="range" class="threshold-slider" data-ns-index="${idx}" data-key="min_available_storage_pct" min="0" max="20" value="${minAvail}" step="0.5"><span class="value">${minAvail}%</span></div>
+          <div class="threshold-hint">When these limits are reached, Aerospike evicts or blocks writes. Used for headroom in capacity planning.</div>
+        </div>`;
         html += '</div>';
       });
       html += '<div class="add-namespace-wrap"><button type="button" id="addNamespace">+ Add namespace</button></div>';
@@ -238,8 +381,15 @@
       el.querySelector('#clusterName').addEventListener('input', (e) => {
         state.cluster.cluster_name = e.target.value;
       });
+      const defaultPatternEl = el.querySelector('#defaultStoragePattern');
+      if (defaultPatternEl) {
+        defaultPatternEl.addEventListener('change', (e) => {
+          state.cluster.default_storage_pattern = e.target.value;
+        });
+      }
       el.querySelectorAll('input[type="range"]').forEach(input => {
         input.addEventListener('input', () => {
+          if (input.classList.contains('threshold-slider')) return;
           const key = input.dataset.key;
           const isCluster = input.dataset.cluster === 'true';
           const val = parseFloat(input.value);
@@ -255,6 +405,55 @@
             const spec = [...CLUSTER_KEYS, ...NAMESPACE_KEYS].find(s => s.key === key);
             span.textContent = formatVal(val, key, spec && spec.log);
           }
+          compute();
+        });
+      });
+      el.querySelectorAll('.threshold-slider').forEach(input => {
+        input.addEventListener('input', () => {
+          const idx = parseInt(input.dataset.nsIndex, 10);
+          const key = input.dataset.key;
+          const val = parseFloat(input.value);
+          state.namespaces[idx][key] = val;
+          const row = input.closest('.input-row');
+          if (row) {
+            const span = row.querySelector('.value');
+            if (span) span.textContent = key === 'min_available_storage_pct' ? val + '%' : Math.round(val) + '%';
+          }
+          compute();
+        });
+      });
+      el.querySelectorAll('.pattern-pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.dataset.nsIndex, 10);
+          const pattern = btn.dataset.pattern;
+          state.namespaces[idx].storage_pattern = pattern;
+          if (pattern !== 'Custom') state.namespaces[idx].placement = placementFromPattern(pattern);
+          renderInputs();
+          compute();
+        });
+      });
+      el.querySelectorAll('.placement-select').forEach(sel => {
+        sel.addEventListener('change', () => {
+          const idx = parseInt(sel.dataset.nsIndex, 10);
+          const slot = sel.dataset.slot;
+          const val = sel.value;
+          if (!state.namespaces[idx].placement) state.namespaces[idx].placement = { primary: 'M', si: 'M', data: 'D' };
+          state.namespaces[idx].placement[slot] = val;
+          state.namespaces[idx].storage_pattern = 'Custom';
+          const card = sel.closest('.input-card');
+          const codeEl = card && card.querySelector('.placement-code');
+          if (codeEl) {
+            const p = state.namespaces[idx].placement;
+            const code = placementToCode(p);
+            codeEl.textContent = 'Code: ' + code + ' — Primary ' + (p.primary === 'M' ? 'in memory' : 'on disk') + ', SI ' + (p.si === 'M' ? 'in memory' : 'on disk') + ', data ' + (p.data === 'M' ? 'in memory' : 'on disk');
+          }
+          compute();
+        });
+      });
+      el.querySelectorAll('.ns-compression').forEach(sel => {
+        sel.addEventListener('change', (e) => {
+          const idx = parseInt(e.target.dataset.nsIndex, 10);
+          state.namespaces[idx].compression = e.target.value;
           compute();
         });
       });
@@ -275,7 +474,7 @@
         });
       });
       el.querySelector('#addNamespace').addEventListener('click', () => {
-        state.namespaces.push(defaultNamespace());
+        state.namespaces.push(defaultNamespace(state.cluster.default_storage_pattern));
         renderInputs();
         compute();
       });
@@ -340,6 +539,36 @@
       return n < 1e6 ? n.toFixed(2) : n.toExponential(2);
     }
 
+    const STORAGE_OVERHEAD_PCT = 0.024;
+
+    function buildShowMyWorkStorage(o) {
+      const dataStoredGb = typeof o.data_stored_gb === 'number' ? o.data_stored_gb : 0;
+      const totalAvailGb = typeof o.total_available_storage_gb === 'number' ? o.total_available_storage_gb : 0;
+      const utilPct = typeof o.storage_utilization_pct === 'number' ? o.storage_utilization_pct : 0;
+      const nodes = state.cluster && (state.cluster.nodes_per_cluster != null) ? Number(state.cluster.nodes_per_cluster) : 0;
+      const devicesPerNode = state.cluster && (state.cluster.devices_per_node != null) ? Number(state.cluster.devices_per_node) : 0;
+      const deviceSizeGb = state.cluster && (state.cluster.device_size_gb != null) ? Number(state.cluster.device_size_gb) : 0;
+      const dataStoredFormula = (state.namespaces || []).map(ns => {
+        const moc = Number(ns.master_object_count ?? 0);
+        const rf = Number(ns.replication_factor ?? 0);
+        const ars = Number(ns.avg_record_size_bytes ?? 0);
+        return moc * rf * ars;
+      });
+      const dataStoredBytes = dataStoredFormula.reduce((a, b) => a + b, 0);
+      const dataStoredGbFromFormula = dataStoredBytes / (1024 ** 3);
+      const dataStoredFormulaText = (state.namespaces || []).length > 1
+        ? 'Σ (Master object count × Replication factor × Avg record size) / 1024³'
+        : 'Master object count × Replication factor × Average record size (bytes) / 1024³';
+      return `
+        <div class="show-my-work-section">
+          <strong><span class="show-my-work-var">Storage utilization %</span></strong>
+          <div class="show-my-work-line"><span class="show-my-work-var">Actual Storage Utilization</span> = Total Data Stored (GB) / Total Storage available per cluster (GB) = ${fmt(dataStoredGb)} / ${fmt(totalAvailGb)} = ${fmt(utilPct)}%</div>
+          <div class="show-my-work-line"><span class="show-my-work-var">Data Stored (GB)</span> = ${dataStoredFormulaText} = ${fmt(dataStoredGbFromFormula)}</div>
+          <div class="show-my-work-line"><span class="show-my-work-var">Total Available Storage (GB)</span> = Nodes per cluster × Devices per node × Device size (GB) × (1 − Cluster storage overhead pct) = ${nodes} × ${devicesPerNode} × ${deviceSizeGb} × (1 − ${(STORAGE_OVERHEAD_PCT * 100).toFixed(1)}%) = ${fmt(totalAvailGb)}</div>
+        </div>
+      `;
+    }
+
     function renderOutputs(o) {
       const nodesLost = state.cluster && state.cluster.nodes_lost != null ? Math.round(state.cluster.nodes_lost) : 0;
       const memNote = o.memory_utilization_base_pct > 100 ? ' <span style="font-size:0.75em; color: var(--muted);">(over-subscribed)</span>' : '';
@@ -362,6 +591,9 @@
             <div class="output-row"><span class="k">Available mem per cluster (GB)</span><span class="v">${fmt(o.available_mem_per_cluster_gb)}</span></div>
             <div class="output-row"><span class="k">Total memory used base (GB)</span><span class="v">${fmt(o.total_memory_used_base_gb)}</span></div>
           </div>
+          <div class="breakdown">
+            <strong>By pattern:</strong> ${buildBreakdownText(state.namespaces)}
+          </div>
         </div>
         <div class="output-section">
           <div class="output-section-title">Failure (${nodesLost} nodes lost)</div>
@@ -375,13 +607,30 @@
         </div>
         <div class="output-section">
           <div class="output-section-title">Data growth</div>
-          <div class="output-section-placeholder">Coming later</div>
+          <div class="output-card">
+            <div class="output-card-title">Projections</div>
+            <div class="output-row"><span class="k">Current data stored (GB)</span><span class="v">${fmt(o.data_stored_gb)}</span></div>
+            <div class="output-row"><span class="k">Projected data (1 yr, GB)</span><span class="v">—</span></div>
+            <div class="output-row"><span class="k">Headroom to stop-writes %</span><span class="v">—</span></div>
+            <div class="output-row"><span class="k">Months to stop-writes (est)</span><span class="v">—</span></div>
+          </div>
         </div>
         <div class="output-section">
           <div class="output-section-title">Performance</div>
-          <div class="output-section-placeholder">Coming later</div>
+          <div class="output-card">
+            <div class="output-card-title">Estimated ops</div>
+            <div class="output-row primary"><span class="k">Read ops/sec (est)</span><span class="v">—</span></div>
+            <div class="output-row primary"><span class="k">Write ops/sec (est)</span><span class="v">—</span></div>
+            <div class="output-row"><span class="k">Latency p99 read (ms)</span><span class="v">—</span></div>
+            <div class="output-row"><span class="k">Latency p99 write (ms)</span><span class="v">—</span></div>
+          </div>
         </div>
       `;
+      const showMyWorkEl = document.getElementById('showMyWorkContent');
+      if (showMyWorkEl) {
+        showMyWorkEl.innerHTML = buildShowMyWorkStorage(o);
+        showMyWorkEl.classList.remove('placeholder');
+      }
     }
 
     document.getElementById('loadDefaults').addEventListener('click', async () => {
@@ -400,6 +649,10 @@
       const file = input.files && input.files[0];
       if (!file) return;
       input.value = '';
+      const btn = document.getElementById('loadCollectinfo');
+      const originalLabel = btn.textContent;
+      btn.textContent = 'Loading…';
+      btn.disabled = true;
       try {
         const formData = new FormData();
         formData.append('file', file);
@@ -412,8 +665,9 @@
         const data = await r.json();
         if (data.cluster && Array.isArray(data.namespaces)) {
           state.cluster = { ...defaultCluster(), ...data.cluster, cluster_name: data.cluster.cluster_name ?? '' };
-          state.namespaces = data.namespaces.map(n => ({ ...defaultNamespace(), ...n, name: n.name ?? '' }));
-          if (state.namespaces.length === 0) state.namespaces = [defaultNamespace()];
+          const defaultPattern = state.cluster.default_storage_pattern || 'HMA (MMD)';
+          state.namespaces = data.namespaces.map(n => ({ ...defaultNamespace(defaultPattern), ...n, name: n.name ?? '' }));
+          if (state.namespaces.length === 0) state.namespaces = [defaultNamespace(defaultPattern)];
         } else {
           state = flatDefaultsToState(data.legacy || data);
         }
@@ -421,6 +675,9 @@
         await compute();
       } catch (err) {
         alert(err.message || 'Load from collectinfo failed');
+      } finally {
+        btn.textContent = originalLabel;
+        btn.disabled = false;
       }
     });
 
