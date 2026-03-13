@@ -21,6 +21,13 @@ Copy this block when adding a new session; fill and paste above the "---" under 
 
 ## Recent sessions
 
+### 2026-03-12 Collectinfo load accuracy and derivation fixes
+
+- **Summary:** Fixed Load from collectinfo so Data stored and Storage utilization % match asadm when loading multi-namespace bundles (e.g. nielsen). Device Total is parsed as TB or GB; namespaces with no device (Drives Total = 0) get object_count as-is (0 stays 0), avg_record_size 0, storage_pattern In-Memory (MMM), and placement data=M so they contribute 0 to device storage. Per-namespace device bytes from asadm device_data_bytes/device_used_bytes; mapping sets avg_record_size from data_used_bytes and uses drives_total to infer no-device namespaces. Derivation script updated: Device Total TB→GB, Memory (Data + Indexes) Total, device_used_bytes fallback for 6.x. UI no longer uses schema max for missing avg_record_size_bytes. Added scripts/gather_asadm_for_calculations.sh for uploading asadm outputs.
+- **Files changed/created:** `ingest/asadm_ingest.py` (Device Total TB/GB, drives_total and object_count in namespace row, cluster Memory total parsing), `ingest/mapping.py` (avg_record_size 0 for no-device/zero objects, storage_pattern and placement from drives_total), `app/static/index.html` (load merge fallback for avg_record_size_bytes), `tests/test_collectinfo_derivations.sh` (Device Total unit, Memory total, device_used_bytes fallback), `scripts/gather_asadm_for_calculations.sh` (new), `tests/test_mapping.py` (no-device and drives_total tests), `README.md`, `MANIFEST.md`, `docs/SESSION_LOG.md`.
+- **Decisions / notes:** Model docs (model_calculation_storage_util.md, model_calculation_mem_util.md) are the source for calculation logic. Calculation spreadsheet (CALCULATION_SPREADSHEET.md) is not the driver; plan was to fix calculations from model docs.
+- **Follow-ups:** Optional: align storage utilization denominator with MaxDataPct (StopWritesStoragePct, MinAvailStoragePct) per model; derive StoragePattern from asadm config (index-type, sindex-type, storage-engine) when not using summary.
+
 ### 2026-03-10 Mockup and SESSION_LOG date corrections
 
 - **Summary:** Created docs/mockups/mockup-capacity-combined.html as a static reference mockup derived from app/static/index.html (layout, Cluster default pattern, Namespace pattern pills/compression/thresholds, Outputs with breakdown and Data growth/Performance, Parameter help + Show my work). Corrected all SESSION_LOG.md entry dates from 2025-02-27 to 2026-02-27 for older sessions and 2026-03-10 for the Mockup UI restore session.

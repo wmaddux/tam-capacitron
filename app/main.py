@@ -7,6 +7,8 @@ Run: uvicorn app.main:app --reload
 import tempfile
 from pathlib import Path
 
+from typing import Optional
+
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -87,7 +89,7 @@ def api_compute(body: ComputeBody) -> dict:
 
 
 class ClusterBody(BaseModel):
-    """Cluster-level parameters. cluster_name is optional and not used in calculations."""
+    """Cluster-level parameters. cluster_name and default_storage_pattern optional."""
 
     nodes_per_cluster: float = 3.0
     devices_per_node: float = 2.0
@@ -96,10 +98,11 @@ class ClusterBody(BaseModel):
     overhead_pct: float = 0.15
     nodes_lost: float = 0.0
     cluster_name: str = ""
+    default_storage_pattern: str = "HMA (MMD)"
 
 
 class NamespaceBody(BaseModel):
-    """Workload parameters for one namespace."""
+    """Workload parameters for one namespace; placement and thresholds optional."""
 
     name: str = ""
     replication_factor: float = 2.0
@@ -110,6 +113,12 @@ class NamespaceBody(BaseModel):
     tombstone_pct: float = 0.0
     si_count: float = 0.0
     si_entries_per_object: float = 0.0
+    storage_pattern: str = "HMA (MMD)"
+    placement: Optional[dict] = None  # { primary: 'M'|'D', si: 'M'|'D', data: 'M'|'D' }
+    compression_ratio: float = 1.0
+    stop_writes_at_storage_pct: float = 90.0
+    evict_at_memory_pct: float = 95.0
+    min_available_storage_pct: float = 5.0
 
 
 class ComputeV2Body(BaseModel):
@@ -135,6 +144,7 @@ def api_compute_v2(body: ComputeV2Body) -> dict:
         overhead_pct=body.cluster.overhead_pct,
         nodes_lost=body.cluster.nodes_lost,
         cluster_name=body.cluster.cluster_name,
+        default_storage_pattern=body.cluster.default_storage_pattern,
     )
     namespaces = [
         NamespaceInputs(
@@ -147,6 +157,12 @@ def api_compute_v2(body: ComputeV2Body) -> dict:
             tombstone_pct=ns.tombstone_pct,
             si_count=ns.si_count,
             si_entries_per_object=ns.si_entries_per_object,
+            storage_pattern=ns.storage_pattern,
+            placement=ns.placement if ns.placement is not None else {"primary": "M", "si": "M", "data": "D"},
+            compression_ratio=ns.compression_ratio,
+            stop_writes_at_storage_pct=ns.stop_writes_at_storage_pct,
+            evict_at_memory_pct=ns.evict_at_memory_pct,
+            min_available_storage_pct=ns.min_available_storage_pct,
         )
         for ns in body.namespaces
     ]
@@ -190,13 +206,15 @@ async def api_load_collectinfo(file: UploadFile = File(...)) -> dict:
     Use "cluster" and "namespaces" for multi-namespace UI; use "legacy" for the
     current single-namespace form (Load from collectinfo populates from first namespace).
 
-    For .zip: runs asadm -cf <path> -e "summary", parses all namespaces.
+    For .zip, .tgz, .tar: runs asadm -cf <path> -e "summary", parses all namespaces.
     For other files: returns stub (one namespace).
     """
     try:
         filename = (file.filename or "").lower()
-        if filename.endswith(".zip"):
-            with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
+        bundle_suffixes = (".zip", ".tgz", ".tar")
+        if any(filename.endswith(s) for s in bundle_suffixes):
+            suffix = next(s for s in bundle_suffixes if filename.endswith(s))
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
                 tmp.write(await file.read())
                 tmp.flush()
                 tmp_path = tmp.name

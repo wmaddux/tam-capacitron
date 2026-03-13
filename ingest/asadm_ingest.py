@@ -191,10 +191,13 @@ def parse_summary_output(raw: str, namespace: str | None = None) -> dict:
     device_total_s = cs.get("Device Total")
     if device_total_s and devices_total:
         try:
-            total_tb = float(re.sub(r"[^\d.]", "", device_total_s))
+            num = float(re.sub(r"[^\d.]", "", device_total_s))
             dev_total = float(devices_total.strip())
-            if dev_total > 0:
-                out["device_size_gb"] = (total_tb * 1024) / dev_total
+            if dev_total > 0 and num > 0:
+                # Summary may be "128.906 TB" or "21.270 GB"
+                s_upper = (device_total_s or "").upper()
+                total_gb = (num * 1024) if "TB" in s_upper else num
+                out["device_size_gb"] = total_gb / dev_total
         except (ValueError, TypeError, ZeroDivisionError):
             pass
     device_used_s = cs.get("Device Used")
@@ -273,10 +276,12 @@ def _build_cluster_dict_from_summary(cs: dict) -> dict:
     device_total_s = cs.get("Device Total")
     if device_total_s and devices_total:
         try:
-            total_tb = float(re.sub(r"[^\d.]", "", device_total_s))
+            num = float(re.sub(r"[^\d.]", "", device_total_s))
             dev_total = float(devices_total.strip())
-            if dev_total > 0:
-                out["device_size_gb"] = (total_tb * 1024) / dev_total
+            if dev_total > 0 and num > 0:
+                s_upper = (device_total_s or "").upper()
+                total_gb = (num * 1024) if "TB" in s_upper else num
+                out["device_size_gb"] = total_gb / dev_total
         except (ValueError, TypeError, ZeroDivisionError):
             pass
     device_used_s = cs.get("Device Used")
@@ -293,6 +298,19 @@ def _build_cluster_dict_from_summary(cs: dict) -> dict:
     out["nodes_lost"] = 0.0
     out["overhead_pct"] = 0.15
     out.setdefault("available_memory_gb", 64.0)
+    # Memory (Data + Indexes) Total or Memory Total (TB/GB) -> available_memory_gb per node
+    nodes = out.get("nodes_per_cluster")
+    for key, val in cs.items():
+        if val and "Memory" in key and "Total" in key and "Used" not in key:
+            try:
+                num = float(re.sub(r"[^\d.]", "", val))
+                s_upper = (val or "").upper()
+                total_gb = (num * 1024) if "TB" in s_upper else num
+                if total_gb > 0 and nodes and nodes > 0:
+                    out["available_memory_gb"] = total_gb / nodes
+            except (ValueError, TypeError):
+                pass
+            break
     return out
 
 
@@ -338,15 +356,24 @@ def _row_to_namespace_dict(row: dict[str, str], cluster_device_size_gb: float | 
                 device_size_gb = dt_gb / dr
         except (ValueError, TypeError, ZeroDivisionError):
             pass
+    # Drives Total from namespace row: 0 = in-memory only (no device data)
+    drives_total_val = 0.0
+    try:
+        dr = row.get("Drives Total", row.get("Total", ""))
+        if dr:
+            drives_total_val = float(re.sub(r"[^\d.]", "", dr))
+    except (ValueError, TypeError):
+        pass
     d: dict = {
         "name": ns_name,
         "replication_factor": replication_factor,
-        "object_count": obj_count if obj_count > 0 else 1e6,
+        "object_count": obj_count,
         "read_pct": read_pct,
         "write_pct": write_pct,
         "tombstone_pct": 0.0,
         "si_count": 0.0,
         "si_entries_per_object": 0.0,
+        "drives_total": drives_total_val,
     }
     if device_size_gb is not None:
         d["device_size_gb"] = device_size_gb
@@ -398,6 +425,48 @@ def parse_summary_output_multi(raw: str) -> dict:
     return result
 
 
+def _sum_stat_column(raw: str) -> float:
+    """
+    Parse asadm flipped stat output (e.g. show stat namespace X like device_used_bytes -flip).
+    Sum the numeric values in the second column (one per node). Returns 0 if parse fails.
+    """
+    total = 0.0
+    for line in (raw or "").splitlines():
+        if "|" not in line:
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) < 2:
+            continue
+        # Skip header (e.g. "Node" or "device_used_bytes")
+        val_s = parts[1].replace(" ", "")
+        if not val_s or not val_s.replace(".", "").replace("-", "").isdigit():
+            continue
+        try:
+            total += float(val_s)
+        except ValueError:
+            continue
+    return total
+
+
+def _namespace_device_data_bytes(bundle_path: str, namespace_name: str) -> float | None:
+    """
+    Get total device data/used bytes for a namespace via asadm (for storage derivation).
+    Tries device_data_bytes first, then device_used_bytes (per model_calculation_storage_util).
+    Returns None if asadm fails or both stats are missing/zero.
+    """
+    for stat_name in ("device_data_bytes", "device_used_bytes"):
+        stdout, err = run_asadm(
+            bundle_path,
+            f'show stat namespace {namespace_name!r} like {stat_name} -flip',
+        )
+        if err or not stdout:
+            continue
+        total = _sum_stat_column(stdout)
+        if total > 0:
+            return total
+    return None
+
+
 def asadm_summary_to_capacity_dict(bundle_path: str, namespace: str | None = None) -> dict:
     """
     Run asadm -cf bundle_path -e "summary", parse output, and return dict for mapping layer.
@@ -415,10 +484,21 @@ def asadm_summary_to_capacity_dict(bundle_path: str, namespace: str | None = Non
 def asadm_summary_to_capacity_multi(bundle_path: str) -> dict:
     """
     Run asadm -cf bundle_path -e "summary", parse output, and return cluster + namespaces.
+    Enriches each namespace with data_used_bytes from show stat (device_data_bytes or
+    device_used_bytes) per docs/model_calculation_storage_util.md so Data stored matches
+    Device Used when loading from collectinfo.
     Returns { "cluster": {...}, "namespaces": [ {...}, ... ] }. If asadm is missing or
     fails, returns empty cluster and empty namespaces (caller should fall back to stub).
     """
     stdout, err = run_asadm(bundle_path, "summary")
     if err or not stdout:
         return {"cluster": {}, "namespaces": []}
-    return parse_summary_output_multi(stdout)
+    result = parse_summary_output_multi(stdout)
+    for ns_dict in result.get("namespaces") or []:
+        name = (ns_dict.get("name") or "").strip()
+        if not name:
+            continue
+        device_bytes = _namespace_device_data_bytes(bundle_path, name)
+        if device_bytes is not None and device_bytes > 0:
+            ns_dict["data_used_bytes"] = device_bytes
+    return result

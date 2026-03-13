@@ -9,11 +9,11 @@ This document records how **CapacityInputs** are populated when loading from col
 | **replication_factor** | Direct | Namespace Summary → Replication Factors | 1:1. |
 | **nodes_per_cluster** | Direct | Cluster Summary → Cluster Size | 1:1. |
 | **devices_per_node** | Direct | Cluster Summary → Devices Per-Node | 1:1. |
-| **device_size_gb** | Derived | (Device Total TB × 1024) / Devices Total | From Cluster or Namespace Summary. |
-| **available_memory_gb** | Default | Not in summary | Default 64; document. |
+| **device_size_gb** | Derived | (Device Total × 1024 if TB, else as-is) / Devices Total | Cluster Summary "Device Total" may be TB or GB; parser is unit-aware. |
+| **available_memory_gb** | From summary or default | "Memory (Data + Indexes) Total" or "Memory Total" (TB/GB) / nodes | Default 64 if not in summary. |
 | **overhead_pct** | Default | Not in asadm summary | Default 0.15. |
 | **master_object_count** | Direct | Namespace Summary → Master/Objects (K/M/G parsed) | 1:1. |
-| **avg_record_size_bytes** | Calculated | data_used_bytes / (master_object_count × replication_factor) | Device Used (TB) → bytes; mapping layer computes. |
+| **avg_record_size_bytes** | Calculated | data_used_bytes / (master_object_count × replication_factor) | Per-namespace from show stat device_data_bytes/device_used_bytes. When master_object_count is 0 or namespace has no device (drives_total = 0), mapping sets 0 so the namespace contributes 0 to device storage. |
 | **read_pct** | From summary | Namespace Summary → Cache Read% | read_pct = value/100; write_pct = 1 - read_pct. |
 | **write_pct** | Calculated | 1 - read_pct | |
 | **tombstone_pct** | Default | Not in summary | Default 0. |
@@ -24,8 +24,10 @@ This document records how **CapacityInputs** are populated when loading from col
 ## asadm commands and flow
 
 - **Primary:** `asadm -cf <bundle_path> -e "summary"`. Provides Cluster Summary (Cluster Size, Devices Total, Devices Per-Node, Device Total/Used) and Namespace Summary (Replication Factors, Cache Read%, Master objects, Device Total per namespace).
-- **Parsing:** Pipe-delimited tables; "Cluster Summary" block then "Namespace Summary" block. K/M/G suffixes parsed (e.g. 6.447 G → 6.447e9). Device Total in TB → device_size_gb = (Device Total TB × 1024) / Devices Total.
-- **Namespace choice:** One namespace per run. Use env **`CAPACITRON_NAMESPACE`** to choose; else first or largest by Master objects.
+- **Per-namespace Device Used (multi-namespace):** After parsing the summary, for each namespace we run `asadm -cf <bundle> -e "show stat namespace <NS> like device_data_bytes -flip"` (then `device_used_bytes` if needed). Sum the numeric column across nodes → **data_used_bytes** for that namespace. This aligns Data stored (GB) and Storage utilization % with asadm’s Device Used / Device Used% (see [model_calculation_storage_util.md](model_calculation_storage_util.md) and [test_collectinfo_derivations.sh](../tests/test_collectinfo_derivations.sh)).
+- **Parsing:** Pipe-delimited tables; "Cluster Summary" block then "Namespace Summary" block. K/M/G suffixes parsed (e.g. 6.447 G → 6.447e9). Device Total: if the value contains "TB", treat as TB (× 1024 → GB); if "GB", use as GB. Each namespace row includes **drives_total** (Drives Total column); when 0, mapping sets **storage_pattern** = "In-Memory (MMM)" and **placement** data = M, and **avg_record_size_bytes** = 0. **object_count** is kept as-is (0 stays 0) so in-memory-only namespaces do not inflate device storage.
+- **Namespace choice (single-namespace):** Use env **`CAPACITRON_NAMESPACE`** to choose; else first or largest by Master objects.
+- **Bundles:** Load accepts .zip, .tgz, and .tar (asadm supports all three).
 - **Dependency:** **asadm** must be on PATH. No SQLite or tam-flash-report. If asadm is missing or the command fails, the ingestor returns stub values.
 
 ## Ingestor output contract (target)

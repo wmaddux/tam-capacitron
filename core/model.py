@@ -6,8 +6,13 @@ See docs/API_MULTI_NAMESPACE.md for the cluster + namespaces request contract.
 All inputs use sensible minimum defaults so the app is usable on load.
 """
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import Any
+
+
+def _default_placement() -> dict[str, str]:
+    """Default placement HMA (MMD): PI in M, SI in M, data on D."""
+    return {"primary": "M", "si": "M", "data": "D"}
 
 
 @dataclass
@@ -21,6 +26,7 @@ class ClusterInputs:
     overhead_pct: float = 0.15
     nodes_lost: float = 0.0
     cluster_name: str = ""
+    default_storage_pattern: str = "HMA (MMD)"
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "ClusterInputs":
@@ -40,10 +46,19 @@ class NamespaceInputs:
     tombstone_pct: float = 0.0
     si_count: float = 0.0
     si_entries_per_object: float = 0.0
+    storage_pattern: str = "HMA (MMD)"
+    placement: dict = field(default_factory=_default_placement)
+    compression_ratio: float = 1.0
+    stop_writes_at_storage_pct: float = 90.0
+    evict_at_memory_pct: float = 95.0
+    min_available_storage_pct: float = 5.0
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "NamespaceInputs":
-        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+        kwargs = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}
+        if "placement" in kwargs and kwargs["placement"] is None:
+            kwargs["placement"] = _default_placement()
+        return cls(**kwargs)
 
 
 @dataclass
@@ -122,6 +137,7 @@ class CapacityOutputs:
     total_device_count: float = 0.0
     data_stored_gb: float = 0.0
     total_available_storage_gb: float = 0.0
+    total_storage_used_gb: float = 0.0
     storage_utilization_pct: float = 0.0
 
     # Healthy cluster – memory
@@ -138,6 +154,9 @@ class CapacityOutputs:
     failure_total_available_storage_gb: float = 0.0
     failure_memory_utilization_pct: float = 0.0
     failure_memory_used_gb: float = 0.0
+
+    # Per-namespace breakdown (optional)
+    per_namespace: list = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

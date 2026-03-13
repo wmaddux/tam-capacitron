@@ -153,6 +153,106 @@ def test_api_compute_v2_two_namespaces_aggregated():
     )
 
 
+def test_api_compute_v2_response_includes_per_namespace_and_total_storage_used():
+    """POST /api/compute-v2 response includes per_namespace array and total_storage_used_gb."""
+    body = {
+        "cluster": {
+            "nodes_per_cluster": 3.0,
+            "devices_per_node": 2.0,
+            "device_size_gb": 100.0,
+            "available_memory_gb": 32.0,
+            "overhead_pct": 0.15,
+            "nodes_lost": 0.0,
+        },
+        "namespaces": [
+            {
+                "name": "ns1",
+                "replication_factor": 2.0,
+                "master_object_count": 1e6,
+                "avg_record_size_bytes": 500.0,
+                "read_pct": 0.5,
+                "write_pct": 0.5,
+                "tombstone_pct": 0.0,
+                "si_count": 0.0,
+                "si_entries_per_object": 0.0,
+            }
+        ],
+    }
+    r = client.post("/api/compute-v2", json=body)
+    assert r.status_code == 200
+    data = r.json()
+    assert "per_namespace" in data
+    assert len(data["per_namespace"]) == 1
+    assert data["per_namespace"][0]["name"] == "ns1"
+    assert "data_stored_gb" in data["per_namespace"][0]
+    assert "memory_used_gb" in data["per_namespace"][0]
+    assert "storage_used_gb" in data["per_namespace"][0]
+    assert "total_storage_used_gb" in data
+    assert data["total_storage_used_gb"] == pytest.approx(
+        data["per_namespace"][0]["storage_used_gb"], rel=1e-9
+    )
+
+
+def test_api_compute_v2_new_fields_round_trip_and_default_behavior():
+    """default_storage_pattern and per-namespace thresholds round-trip; omitted fields use defaults."""
+    body = {
+        "cluster": {
+            "nodes_per_cluster": 4.0,
+            "devices_per_node": 2.0,
+            "device_size_gb": 256.0,
+            "available_memory_gb": 64.0,
+            "overhead_pct": 0.15,
+            "nodes_lost": 0.0,
+            "default_storage_pattern": "All Flash (DDD)",
+        },
+        "namespaces": [
+            {
+                "name": "ns1",
+                "replication_factor": 2.0,
+                "master_object_count": 1e6,
+                "avg_record_size_bytes": 400.0,
+                "read_pct": 0.5,
+                "write_pct": 0.5,
+                "tombstone_pct": 0.0,
+                "si_count": 0.0,
+                "si_entries_per_object": 0.0,
+                "storage_pattern": "In-Memory (MMM)",
+                "placement": {"primary": "M", "si": "M", "data": "M"},
+                "compression_ratio": 0.6,
+                "stop_writes_at_storage_pct": 88.0,
+                "evict_at_memory_pct": 93.0,
+                "min_available_storage_pct": 8.0,
+            }
+        ],
+    }
+    r = client.post("/api/compute-v2", json=body)
+    assert r.status_code == 200
+    data = r.json()
+    # Response includes computed outputs; new inputs are accepted and used (placement affects memory vs storage)
+    assert data["total_storage_used_gb"] == 0.0  # MMM => no storage
+    assert data["total_memory_used_base_gb"] > 0
+    # Default behavior when new fields omitted: same result as before (tested by test_api_compute_v2_one_namespace_matches_legacy)
+    r_minimal = client.post(
+        "/api/compute-v2",
+        json={
+            "cluster": {"nodes_per_cluster": 4.0, "devices_per_node": 2.0, "device_size_gb": 256.0},
+            "namespaces": [
+                {
+                    "name": "default",
+                    "replication_factor": 2.0,
+                    "master_object_count": 1e6,
+                    "avg_record_size_bytes": 400.0,
+                }
+            ],
+        },
+    )
+    assert r_minimal.status_code == 200
+    # Should compute with default placement (HMA) and compression_ratio 1.0
+    minimal_data = r_minimal.json()
+    assert "per_namespace" in minimal_data
+    assert "total_storage_used_gb" in minimal_data
+
+
 def test_api_compute_v2_empty_namespaces_400():
     """POST /api/compute-v2 with empty namespaces returns 400."""
     r = client.post(

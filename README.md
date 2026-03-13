@@ -34,7 +34,7 @@ Then open **http://127.0.0.1:8000** in a browser.
 
 - **Inputs:** Use sliders to change topology, memory, workload, and resilience; outputs update immediately.
 - **Load from defaults:** Resets all inputs to safe minimums and refreshes outputs.
-- **Load from collectinfo:** Upload a bundle (zip) or a collectinfo file; the button shows "Loading…" while the request runs. For zip bundles the app uses **asadm** to parse; asadm must be on PATH. Optional: set **`CAPACITRON_NAMESPACE`** to choose a namespace when the bundle has multiple. See [docs/COLLECTINFO_INPUT_MAPPING.md](docs/COLLECTINFO_INPUT_MAPPING.md).
+- **Load from collectinfo:** Upload a bundle (**.zip**, **.tgz**, or **.tar**) or a collectinfo file; the button shows "Loading…" while the request runs. The app uses **asadm** to parse bundles; asadm must be on PATH. Namespaces with no device (e.g. in-memory-only) get storage pattern In-Memory (MMM) and contribute 0 to device storage; Device Total is parsed as TB or GB from the summary. Optional: set **`CAPACITRON_NAMESPACE`** to choose a namespace when the bundle has multiple. See [docs/COLLECTINFO_INPUT_MAPPING.md](docs/COLLECTINFO_INPUT_MAPPING.md).
 - **Export:** Downloads a JSON file with all current inputs and outputs (standard output format) for storage or sharing.
 
 ## Run tests

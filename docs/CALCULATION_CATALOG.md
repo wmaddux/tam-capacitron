@@ -64,6 +64,25 @@ All capacity calculations implemented in this application are derived from two s
 | Failure usable storage (GB) | `failure_usable_storage_gb` | Effective nodes × devices per node × device size GB × (1 − fragmentation factor) | C71 = (C6−C46)×C7×C8×(1−C23) |
 | Failure storage utilization (%) | `failure_storage_utilization_pct` | 100 × (data stored GB ÷ failure total available storage GB) | Same as healthy, with failure available |
 
+### Placement-aware capacity (memory vs storage by primary / SI / data)
+
+Per-namespace placement determines where primary index (PI), secondary index (SI), and data live: **M** = in memory (shmem for indexes), **D** = on device (storage).
+
+- **Primary index:** M → contributes `primary_index_shmem_gb` to namespace memory; D → same size (shmem proxy per product docs) to namespace storage.
+- **Secondary index:** M → contributes `secondary_index_shmem_gb` to namespace memory; D → same size (shmem cast to disk) to namespace storage.
+- **Data:** M → contributes (logical data size × compression_ratio) to namespace memory; D → contributes (logical data size × compression_ratio) to namespace storage. In Database 7.0+, in-memory data can use storage compression; the same ratio is applied for both M and D.
+
+**Tombstones:** Applied only to index memory: `memory_with_tombstones = index_mem × (1 + tombstone_pct) + data_mem`. Collectinfo-derived shmem already includes tombstones; do not apply the factor again if ingesting collectinfo.
+
+**Aggregation:** `total_memory_used_base_gb` = sum of per-namespace memory (index + data on M, with tombstone factor on index). `total_storage_used_gb` = sum of per-namespace storage (PI + SI + data on D). Storage utilization = 100 × total_storage_used_gb / total_usable_storage_gb.
+
+### Compression (effective size)
+
+Compression is a **user-editable 0–1 factor**: **compression_ratio** = compressed_size / logical_size (e.g. 0.6 means 60% of logical size after compression).
+
+- **Effective data size:** `effective_data_gb = data_size_gb × compression_ratio`. Used for both storage (data on D) and memory (data on M when in-memory compression applies, e.g. 7.x).
+- **Presets (suggested ranges; workload-specific):** Off = 1.0 (no savings); LZ4 ≈ 0.6–0.7 (e.g. Aerospike ~0.659); Zstandard ≈ 0.3–0.5 (e.g. level 1 ~0.33–0.38). Parameter help should state values are workload-dependent.
+
 ### Advanced settings (future)
 
 | Calculation | Description | Source |

@@ -114,3 +114,41 @@ def test_ingestor_multi_to_cluster_and_namespaces_empty_namespaces_uses_default(
     out = ingestor_multi_to_cluster_and_namespaces({"cluster": {"nodes_per_cluster": 4.0}, "namespaces": []})
     assert len(out["namespaces"]) == 1
     assert out["namespaces"][0]["master_object_count"] == get_default_inputs().master_object_count
+
+
+def test_ingestor_multi_per_namespace_data_used_sets_avg_record_size():
+    """When a namespace has data_used_bytes (e.g. from asadm show stat), mapping uses it for avg_record_size."""
+    from ingest.mapping import ingestor_multi_to_cluster_and_namespaces
+
+    # users_eu: 5.868e9 master, rf=2 → 1.1736e10 replicated records; 81.414 TB = 81.414*1024^4 bytes
+    device_used_bytes = 81.414 * (1024**4)
+    multi = {
+        "cluster": {"nodes_per_cluster": 11.0, "devices_per_node": 12.0, "device_size_gb": 1000.0},
+        "namespaces": [
+            {"name": "locks", "object_count": 0.0, "replication_factor": 2.0},
+            {
+                "name": "users_eu",
+                "object_count": 5.868e9,
+                "replication_factor": 2.0,
+                "data_used_bytes": device_used_bytes,
+            },
+        ],
+    }
+    out = ingestor_multi_to_cluster_and_namespaces(multi)
+    assert len(out["namespaces"]) == 2
+    # users_eu should get avg_record_size = device_used_bytes / (master * rf)
+    expected_avg = device_used_bytes / (5.868e9 * 2.0)
+    assert out["namespaces"][1]["avg_record_size_bytes"] == pytest.approx(expected_avg, rel=1e-6)
+    # So engine data_stored for users_eu = 5.868e9 * 2 * expected_avg = device_used_bytes → 81.414 TB
+    assert out["namespaces"][1]["master_object_count"] == 5.868e9
+    # locks has object_count 0 → avg_record_size 0 (no device data)
+    assert out["namespaces"][0]["avg_record_size_bytes"] == 0.0
+    # When drives_total is 0, storage_pattern is In-Memory (MMM) and placement data=M
+    multi_in_mem = {
+        "cluster": {"nodes_per_cluster": 3.0},
+        "namespaces": [{"name": "memonly", "object_count": 1e6, "replication_factor": 2.0, "drives_total": 0.0}],
+    }
+    out_mem = ingestor_multi_to_cluster_and_namespaces(multi_in_mem)
+    assert out_mem["namespaces"][0]["storage_pattern"] == "In-Memory (MMM)"
+    assert out_mem["namespaces"][0]["placement"]["data"] == "M"
+    assert out_mem["namespaces"][0]["avg_record_size_bytes"] == 0.0

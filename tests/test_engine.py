@@ -136,3 +136,96 @@ def test_run_multi_empty_namespaces_raises():
     cluster = ClusterInputs(nodes_per_cluster=3.0)
     with pytest.raises(ValueError, match="At least one namespace"):
         run_multi(cluster, [])
+
+
+def test_run_multi_returns_per_namespace_and_total_storage_used():
+    """run_multi returns per_namespace list and total_storage_used_gb."""
+    cluster = ClusterInputs(nodes_per_cluster=3.0, devices_per_node=2.0, device_size_gb=100.0)
+    ns = NamespaceInputs(
+        name="test",
+        replication_factor=2.0,
+        master_object_count=1e6,
+        avg_record_size_bytes=500.0,
+        si_count=0.0,
+        si_entries_per_object=0.0,
+    )
+    out = run_multi(cluster, [ns])
+    assert hasattr(out, "per_namespace")
+    assert len(out.per_namespace) == 1
+    assert out.per_namespace[0]["name"] == "test"
+    assert "data_stored_gb" in out.per_namespace[0]
+    assert "memory_used_gb" in out.per_namespace[0]
+    assert "storage_used_gb" in out.per_namespace[0]
+    assert out.total_storage_used_gb >= 0
+    assert out.total_storage_used_gb == pytest.approx(out.per_namespace[0]["storage_used_gb"], rel=1e-9)
+
+
+def test_run_multi_placement_all_d_storage_only():
+    """With All Flash (DDD), storage_used includes PI + SI + data; memory used is minimal (no index/data on M)."""
+    cluster = ClusterInputs(nodes_per_cluster=3.0, devices_per_node=2.0, device_size_gb=500.0)
+    ns = NamespaceInputs(
+        name="flash",
+        replication_factor=2.0,
+        master_object_count=1e6,
+        avg_record_size_bytes=400.0,
+        storage_pattern="All Flash (DDD)",
+        placement={"primary": "D", "si": "D", "data": "D"},
+        compression_ratio=1.0,
+        si_count=1.0,
+        si_entries_per_object=0.5,
+    )
+    out = run_multi(cluster, [ns])
+    assert out.per_namespace[0]["storage_used_gb"] > 0
+    assert out.per_namespace[0]["memory_used_gb"] == 0.0
+    assert out.total_memory_used_base_gb == 0.0
+    assert out.total_storage_used_gb >= out.data_stored_gb  # PI + SI + data on D
+
+
+def test_run_multi_placement_all_m_memory_only():
+    """With In-Memory (MMM), memory_used includes PI + SI + data; storage_used is 0."""
+    cluster = ClusterInputs(nodes_per_cluster=3.0, devices_per_node=2.0, device_size_gb=500.0)
+    ns = NamespaceInputs(
+        name="mem",
+        replication_factor=2.0,
+        master_object_count=500_000.0,
+        avg_record_size_bytes=200.0,
+        storage_pattern="In-Memory (MMM)",
+        placement={"primary": "M", "si": "M", "data": "M"},
+        compression_ratio=1.0,
+        si_count=0.0,
+        si_entries_per_object=0.0,
+    )
+    out = run_multi(cluster, [ns])
+    assert out.per_namespace[0]["storage_used_gb"] == 0.0
+    assert out.per_namespace[0]["memory_used_gb"] > 0
+    assert out.total_storage_used_gb == 0.0
+    assert out.storage_utilization_pct == 0.0
+
+
+def test_run_multi_compression_reduces_storage_used():
+    """With data on D and compression_ratio < 1, storage_used is less than data_stored."""
+    cluster = ClusterInputs(nodes_per_cluster=3.0, devices_per_node=2.0, device_size_gb=500.0)
+    ns_no_comp = NamespaceInputs(
+        name="nocomp",
+        replication_factor=2.0,
+        master_object_count=1e6,
+        avg_record_size_bytes=500.0,
+        compression_ratio=1.0,
+        si_count=0.0,
+        si_entries_per_object=0.0,
+    )
+    ns_comp = NamespaceInputs(
+        name="comp",
+        replication_factor=2.0,
+        master_object_count=1e6,
+        avg_record_size_bytes=500.0,
+        compression_ratio=0.5,
+        si_count=0.0,
+        si_entries_per_object=0.0,
+    )
+    out_no = run_multi(cluster, [ns_no_comp])
+    out_comp = run_multi(cluster, [ns_comp])
+    assert out_comp.total_storage_used_gb < out_no.total_storage_used_gb
+    assert out_comp.per_namespace[0]["storage_used_gb"] == pytest.approx(
+        out_no.per_namespace[0]["storage_used_gb"] * 0.5, rel=1e-5
+    )

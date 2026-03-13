@@ -92,7 +92,7 @@
   <div class="toolbar">
     <button type="button" id="loadDefaults">Load from defaults</button>
     <button type="button" id="loadCollectinfo">Load from collectinfo</button>
-    <input type="file" id="collectinfoFile" accept=".zip,.txt,.log,application/zip,text/plain" style="display: none;">
+    <input type="file" id="collectinfoFile" accept=".zip,.tgz,.tar,.txt,.log,application/zip,application/gzip,application/x-tar,text/plain" style="display: none;">
     <button type="button" id="exportBtn">Export</button>
   </div>
 
@@ -499,10 +499,17 @@
       return r.json();
     }
 
+    function compressionRatioFromPreset(preset) {
+      if (preset === 'LZ4') return 0.6;
+      if (preset === 'Zstandard') return 0.35;
+      return 1.0; // Off
+    }
+
     async function compute() {
       const body = {
         cluster: {
           cluster_name: state.cluster.cluster_name || '',
+          default_storage_pattern: state.cluster.default_storage_pattern || 'HMA (MMD)',
           nodes_per_cluster: state.cluster.nodes_per_cluster,
           devices_per_node: state.cluster.devices_per_node,
           device_size_gb: state.cluster.device_size_gb,
@@ -520,6 +527,12 @@
           tombstone_pct: ns.tombstone_pct,
           si_count: ns.si_count,
           si_entries_per_object: ns.si_entries_per_object,
+          storage_pattern: ns.storage_pattern || 'HMA (MMD)',
+          placement: ns.placement || { primary: 'M', si: 'M', data: 'D' },
+          compression_ratio: ns.compression_ratio != null ? ns.compression_ratio : compressionRatioFromPreset(ns.compression),
+          stop_writes_at_storage_pct: ns.stop_writes_at_storage_pct != null ? ns.stop_writes_at_storage_pct : 90,
+          evict_at_memory_pct: ns.evict_at_memory_pct != null ? ns.evict_at_memory_pct : 95,
+          min_available_storage_pct: ns.min_available_storage_pct != null ? ns.min_available_storage_pct : 5,
         })),
       };
       const r = await fetch('/api/compute-v2', {
@@ -666,7 +679,11 @@
         if (data.cluster && Array.isArray(data.namespaces)) {
           state.cluster = { ...defaultCluster(), ...data.cluster, cluster_name: data.cluster.cluster_name ?? '' };
           const defaultPattern = state.cluster.default_storage_pattern || 'HMA (MMD)';
-          state.namespaces = data.namespaces.map(n => ({ ...defaultNamespace(defaultPattern), ...n, name: n.name ?? '' }));
+          state.namespaces = data.namespaces.map(n => {
+            const merged = { ...defaultNamespace(defaultPattern), ...n, name: n.name ?? '' };
+            if (typeof merged.avg_record_size_bytes !== 'number') merged.avg_record_size_bytes = 500;
+            return merged;
+          });
           if (state.namespaces.length === 0) state.namespaces = [defaultNamespace(defaultPattern)];
         } else {
           state = flatDefaultsToState(data.legacy || data);

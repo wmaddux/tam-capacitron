@@ -23,7 +23,7 @@ When implementing multiple namespaces, the following computational changes apply
 
 ## Current implementation state (for new agents)
 
-- **Multi-namespace:** Implemented. Engine `run_multi(cluster, namespaces)`; API **POST /api/compute-v2**; ingest returns `cluster` + `namespaces`. See [docs/API_MULTI_NAMESPACE.md](docs/API_MULTI_NAMESPACE.md).
+- **Multi-namespace:** Implemented. Engine `run_multi(cluster, namespaces)`; API **POST /api/compute-v2**; ingest returns `cluster` + `namespaces` (with per-namespace `storage_pattern`, `placement` when derivable from summary). Load from collectinfo accepts .zip, .tgz, .tar; Device Total parsed as TB/GB; no-device namespaces (Drives Total = 0) get In-Memory (MMM) and 0 device storage. See [docs/API_MULTI_NAMESPACE.md](docs/API_MULTI_NAMESPACE.md).
 - **Phase 2 UI:** Three-column layout (Inputs | Outputs | Definition), Cluster card, Namespaces cards with Add/Remove, param help in Definition column. State is `{ cluster, namespaces[] }`. Load from defaults, Load from collectinfo, Export. See [MANIFEST.md](MANIFEST.md) and [app/static/index.html](app/static/index.html).
 - **Memory formula:** Total memory used base = **Primary Index Shmem** (64 bytes per replicated object) + **Secondary Index Shmem** (collectinfo-style: entries = M×RF×E, data + cushion). See [docs/CALCULATION_CATALOG.md](docs/CALCULATION_CATALOG.md) and `core/formulas.py`.
 - **Run:** `PYTHONPATH=. uvicorn app.main:app --reload` then http://127.0.0.1:8000. Tests: `PYTHONPATH=. python -m pytest tests/ -v`.

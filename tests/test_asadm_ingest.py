@@ -4,6 +4,7 @@ Unit tests for asadm-based collectinfo ingestion: run_asadm and parse_summary_ou
 
 import pytest
 from ingest.asadm_ingest import (
+    _sum_stat_column,
     parse_summary_output,
     parse_summary_output_multi,
     run_asadm,
@@ -157,3 +158,19 @@ def test_parse_pct():
     assert _parse_pct("24.0 %") == pytest.approx(0.24, rel=0.01)
     assert _parse_pct("31.95 %") == pytest.approx(0.3195, rel=0.01)
     assert _parse_pct("0.5") == 0.5
+
+
+def test_sum_stat_column():
+    """_sum_stat_column sums numeric second column from asadm -flip output."""
+    raw = """
+~users_eu Namespace Statistics (2026-01-13 09:53:56 UTC)~
+             Node|device_used_bytes
+10.92.71.105:3000|    8145310387840
+10.92.71.117:3000|    8142452720032
+10.92.71.144:3000|    8133400164304
+"""
+    total = _sum_stat_column(raw)
+    expected = 8145310387840 + 8142452720032 + 8133400164304
+    assert total == pytest.approx(expected, rel=0)
+    assert _sum_stat_column("") == 0.0
+    assert _sum_stat_column("Node|device_used_bytes\n") == 0.0

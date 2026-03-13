@@ -159,6 +159,24 @@ def ingestor_multi_to_cluster_and_namespaces(multi_output: dict) -> dict:
         avg_record_size_bytes = _float(ns_in, "avg_record_size_bytes", defaults.avg_record_size_bytes)
         if avg_record_size_bytes == defaults.avg_record_size_bytes and single_ns_avg_record is not None:
             avg_record_size_bytes = single_ns_avg_record
+        # Per-namespace data_used_bytes (from asadm show stat device_data_bytes/device_used_bytes)
+        # so Data stored matches Device Used when loading from collectinfo (model_calculation_storage_util).
+        if avg_record_size_bytes == defaults.avg_record_size_bytes:
+            ns_data_used = _float(ns_in, "data_used_bytes", 0.0)
+            drives_total = _float(ns_in, "drives_total", -1.0)
+            # No device (drives_total 0) or no objects: contribute 0 to device data
+            if master_object_count == 0 or (drives_total == 0 and ns_data_used <= 0):
+                avg_record_size_bytes = 0.0
+            elif ns_data_used > 0 and master_object_count > 0 and replication_factor > 0:
+                avg_record_size_bytes = ns_data_used / (master_object_count * replication_factor)
+                avg_record_size_bytes = max(1.0, min(avg_record_size_bytes, 10**7))
+        drives_total = _float(ns_in, "drives_total", -1.0)
+        storage_pattern = "In-Memory (MMM)" if drives_total == 0 else "HMA (MMD)"
+        placement = (
+            {"primary": "M", "si": "M", "data": "M"}
+            if drives_total == 0
+            else {"primary": "M", "si": "M", "data": "D"}
+        )
         namespaces.append({
             "name": (ns_in.get("name") or "").strip(),
             "replication_factor": replication_factor,
@@ -169,6 +187,8 @@ def ingestor_multi_to_cluster_and_namespaces(multi_output: dict) -> dict:
             "tombstone_pct": _float(ns_in, "tombstone_pct", defaults.tombstone_pct),
             "si_count": _float(ns_in, "si_count", defaults.si_count),
             "si_entries_per_object": _float(ns_in, "si_entries_per_object", defaults.si_entries_per_object),
+            "storage_pattern": storage_pattern,
+            "placement": placement,
         })
     if not namespaces:
         namespaces = [{
