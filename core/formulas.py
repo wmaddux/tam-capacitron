@@ -16,7 +16,7 @@ RECORD_METADATA_BYTES = 64.0  # per-record overhead (Primary Index Shmem: 64 byt
 # Secondary index shmem (collectinfo-style; see CALCULATION_CATALOG)
 SI_ENTRY_SIZE_BYTES = 32.0  # S: average SI entry size (bytes)
 SI_FILL_FACTOR = 0.75  # F: index fill factor (0–1)
-SI_CUSHION_PER_INDEX_PER_NODE_BYTES = 41_943_040.0  # H: fixed cushion per index per node (~40 MiB)
+SI_CUSHION_PER_INDEX_PER_NODE_BYTES = 16_777_216.0  # H: fixed cushion per index per node (16 MiB)
 
 
 def device_total_storage_tb(

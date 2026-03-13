@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from app.config import get_defaults, get_slider_specs
 from core.model import (
     CapacityInputs,
     CapacityOutputs,
@@ -33,29 +34,38 @@ app = FastAPI(title="tam-capacitron", version="0.1.0")
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
+_DEFAULTS = get_defaults()
+
+
 @app.get("/api/defaults")
 def api_defaults() -> dict:
-    """Return default inputs for Load from defaults."""
+    """Return default inputs for Load from defaults (from config/inputs.json)."""
     return get_default_inputs().to_dict()
 
 
-class ComputeBody(BaseModel):
-    """Inputs as JSON; extra keys ignored."""
+@app.get("/api/input-config")
+def api_input_config() -> dict:
+    """Return defaults and slider schema in one response for the UI."""
+    return {"defaults": get_default_inputs().to_dict(), "schema": get_slider_specs()}
 
-    replication_factor: float = 2.0
-    nodes_per_cluster: float = 3.0
-    devices_per_node: float = 2.0
-    device_size_gb: float = 50.0
-    available_memory_gb: float = 64.0
-    overhead_pct: float = 0.15
-    master_object_count: float = 1e6
-    avg_record_size_bytes: float = 500.0
-    read_pct: float = 0.5
-    write_pct: float = 0.5
-    tombstone_pct: float = 0.0
-    si_count: float = 0.0
-    si_entries_per_object: float = 0.0
-    nodes_lost: float = 0.0
+
+class ComputeBody(BaseModel):
+    """Inputs as JSON; extra keys ignored. Defaults from config/inputs.json."""
+
+    replication_factor: float = _DEFAULTS.get("replication_factor", 2.0)
+    nodes_per_cluster: float = _DEFAULTS.get("nodes_per_cluster", 6.0)
+    devices_per_node: float = _DEFAULTS.get("devices_per_node", 3.0)
+    device_size_gb: float = _DEFAULTS.get("device_size_gb", 256.0)
+    available_memory_gb: float = _DEFAULTS.get("available_memory_gb", 128.0)
+    overhead_pct: float = _DEFAULTS.get("overhead_pct", 0.15)
+    master_object_count: float = _DEFAULTS.get("master_object_count", 1e6)
+    avg_record_size_bytes: float = _DEFAULTS.get("avg_record_size_bytes", 500.0)
+    read_pct: float = _DEFAULTS.get("read_pct", 0.5)
+    write_pct: float = _DEFAULTS.get("write_pct", 0.5)
+    tombstone_pct: float = _DEFAULTS.get("tombstone_pct", 0.0)
+    si_count: float = _DEFAULTS.get("si_count", 0.0)
+    si_entries_per_object: float = _DEFAULTS.get("si_entries_per_object", 0.0)
+    nodes_lost: float = _DEFAULTS.get("nodes_lost", 0.0)
 
 
 def _compute_body_to_inputs(body: ComputeBody) -> CapacityInputs:
@@ -89,16 +99,19 @@ def api_compute(body: ComputeBody) -> dict:
 
 
 class ClusterBody(BaseModel):
-    """Cluster-level parameters. cluster_name and default_storage_pattern optional."""
+    """Cluster-level parameters. cluster_name and default_storage_pattern optional. Defaults from config."""
 
-    nodes_per_cluster: float = 3.0
-    devices_per_node: float = 2.0
-    device_size_gb: float = 50.0
-    available_memory_gb: float = 64.0
-    overhead_pct: float = 0.15
-    nodes_lost: float = 0.0
+    nodes_per_cluster: float = _DEFAULTS.get("nodes_per_cluster", 6.0)
+    devices_per_node: float = _DEFAULTS.get("devices_per_node", 3.0)
+    device_size_gb: float = _DEFAULTS.get("device_size_gb", 256.0)
+    available_memory_gb: float = _DEFAULTS.get("available_memory_gb", 128.0)
+    overhead_pct: float = _DEFAULTS.get("overhead_pct", 0.15)
+    nodes_lost: float = _DEFAULTS.get("nodes_lost", 0.0)
     cluster_name: str = ""
     default_storage_pattern: str = "HMA (MMD)"
+    vcpus: float = 0.0
+    instance_storage: str = ""
+    instance_networking: str = ""
 
 
 class NamespaceBody(BaseModel):
@@ -145,6 +158,9 @@ def api_compute_v2(body: ComputeV2Body) -> dict:
         nodes_lost=body.cluster.nodes_lost,
         cluster_name=body.cluster.cluster_name,
         default_storage_pattern=body.cluster.default_storage_pattern,
+        vcpus=body.cluster.vcpus,
+        instance_storage=body.cluster.instance_storage or "",
+        instance_networking=body.cluster.instance_networking or "",
     )
     namespaces = [
         NamespaceInputs(
@@ -242,23 +258,8 @@ async def api_load_collectinfo(file: UploadFile = File(...)) -> dict:
 
 @app.get("/api/schema")
 def api_schema() -> dict:
-    """Return input field metadata (min, max, step) for UI sliders."""
-    return {
-        "replication_factor": {"min": 1, "max": 4, "step": 1},
-        "nodes_per_cluster": {"min": 1, "max": 64, "step": 1},
-        "devices_per_node": {"min": 1, "max": 24, "step": 1},
-        "device_size_gb": {"min": 50, "max": 4096, "step": 64},
-        "available_memory_gb": {"min": 16, "max": 1024, "step": 16},
-        "overhead_pct": {"min": 0, "max": 0.5, "step": 0.01},
-        "master_object_count": {"min": 1e4, "max": 1e12, "step": 1e6},
-        "avg_record_size_bytes": {"min": 100, "max": 1e7, "step": 10000},
-        "read_pct": {"min": 0, "max": 1, "step": 0.01},
-        "write_pct": {"min": 0, "max": 1, "step": 0.01},
-        "tombstone_pct": {"min": 0, "max": 0.5, "step": 0.01},
-        "si_count": {"min": 0, "max": 20, "step": 1},
-        "si_entries_per_object": {"min": 0, "max": 10, "step": 0.1},
-        "nodes_lost": {"min": 0, "max": 16, "step": 1},
-    }
+    """Return input field metadata (min, max, step) for UI sliders (from config/inputs.json)."""
+    return get_slider_specs()
 
 
 if STATIC_DIR.is_dir():

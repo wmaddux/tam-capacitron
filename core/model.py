@@ -19,14 +19,18 @@ def _default_placement() -> dict[str, str]:
 class ClusterInputs:
     """Cluster-level parameters (one value for the whole cluster)."""
 
-    nodes_per_cluster: float = 3.0
-    devices_per_node: float = 2.0
-    device_size_gb: float = 50.0
-    available_memory_gb: float = 64.0
+    nodes_per_cluster: float = 6.0
+    devices_per_node: float = 3.0
+    device_size_gb: float = 256.0
+    available_memory_gb: float = 128.0
     overhead_pct: float = 0.15
     nodes_lost: float = 0.0
     cluster_name: str = ""
     default_storage_pattern: str = "HMA (MMD)"
+    # Server instance specs (for mapping from cloud instance type; not used in calculations yet)
+    vcpus: float = 0.0
+    instance_storage: str = ""
+    instance_networking: str = ""
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "ClusterInputs":
@@ -63,16 +67,16 @@ class NamespaceInputs:
 
 @dataclass
 class CapacityInputs:
-    """All inputs for the capacity engine. Defaults are minimum safe values."""
+    """All inputs for the capacity engine. Defaults are representative of a test cluster (mid-range outputs)."""
 
     # Topology
     replication_factor: float = 2.0
-    nodes_per_cluster: float = 3.0
-    devices_per_node: float = 2.0
-    device_size_gb: float = 50.0
+    nodes_per_cluster: float = 6.0
+    devices_per_node: float = 3.0
+    device_size_gb: float = 256.0
 
     # Server / memory
-    available_memory_gb: float = 64.0
+    available_memory_gb: float = 128.0
     overhead_pct: float = 0.15
 
     # Workload
@@ -96,8 +100,18 @@ class CapacityInputs:
 
 
 def get_default_inputs() -> CapacityInputs:
-    """Load-from-defaults: return inputs at minimum safe values."""
-    return CapacityInputs()
+    """Load-from-defaults: return inputs from config/inputs.json, else dataclass defaults."""
+    try:
+        from app.config import get_defaults
+        overrides = get_defaults()
+    except Exception:
+        overrides = {}
+    base = CapacityInputs()
+    base_dict = asdict(base)
+    for k, v in overrides.items():
+        if k in base_dict:
+            base_dict[k] = v
+    return CapacityInputs(**base_dict)
 
 
 def capacity_inputs_to_cluster_and_namespaces(

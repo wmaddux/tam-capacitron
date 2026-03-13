@@ -82,9 +82,11 @@
     .param-help .placeholder { font-style: italic; color: var(--muted); opacity: 0.85; }
     .show-my-work-panel .placeholder { font-size: 0.78rem; color: var(--muted); font-style: italic; line-height: 1.4; opacity: 0.85; }
     .show-my-work-section { font-size: 0.78rem; line-height: 1.5; color: var(--text); }
+    .show-my-work-section + .show-my-work-section { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
     .show-my-work-section strong { display: block; margin-bottom: 0.35rem; color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; }
     .show-my-work-line { margin-bottom: 0.4rem; word-break: break-word; }
     .show-my-work-var { font-weight: 600; }
+    .cluster-divider { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }
   </style>
 </head>
 <body>
@@ -118,14 +120,20 @@
   </div>
 
   <script>
-    const CLUSTER_KEYS = [
+    const INSTANCE_SPEC_KEYS = [
+      { key: 'vcpus', label: 'vCPUs', log: false },
+      { key: 'available_memory_gb', label: 'RAM (GB)', log: false },
+    ];
+    const CLUSTER_KEYS_TOPOLOGY = [
       { key: 'nodes_per_cluster', label: 'Nodes per cluster', log: false },
       { key: 'devices_per_node', label: 'Devices per node', log: false },
       { key: 'device_size_gb', label: 'Device size (GB)', log: false },
-      { key: 'available_memory_gb', label: 'Available memory/node (GB)', log: false },
       { key: 'overhead_pct', label: 'Overhead %', log: false },
+    ];
+    const CLUSTER_KEYS_RESILIENCE = [
       { key: 'nodes_lost', label: 'Nodes lost (failure)', log: false },
     ];
+    const CLUSTER_KEYS = [...CLUSTER_KEYS_TOPOLOGY, ...CLUSTER_KEYS_RESILIENCE];
     const NAMESPACE_KEYS = [
       { key: 'replication_factor', label: 'Replication factor', log: false },
       { key: 'master_object_count', label: 'Master object count', log: true },
@@ -141,6 +149,7 @@
       nodes_per_cluster: { min: 1, max: 64, step: 1 },
       devices_per_node: { min: 1, max: 24, step: 1 },
       device_size_gb: { min: 50, max: 4096, step: 64 },
+      vcpus: { min: 0, max: 256, step: 1 },
       available_memory_gb: { min: 16, max: 1024, step: 16 },
       overhead_pct: { min: 0, max: 0.5, step: 0.01 },
       master_object_count: { min: 1e4, max: 1e12, step: 1e6 },
@@ -168,6 +177,7 @@
       si_entries_per_object: 'Average secondary index entries per object. With SI count, affects memory and storage for indexes.',
       nodes_lost: 'Number of nodes assumed lost in the failure scenario. Used to compute effective nodes and failure utilization.',
       default_storage_pattern: 'New namespaces inherit this pattern (HMA, In-Memory, All Flash, DMD) until overridden per namespace.',
+      vcpus: 'Virtual CPUs per node (from cloud instance type). For reference only; not used in calculations yet.',
     };
 
     const STORAGE_PATTERNS = [
@@ -211,9 +221,11 @@
 
     let state = { cluster: {}, namespaces: [] };
     let lastOutput = null;
+    /** Slider min/max/step from GET /api/input-config (config/inputs.json). Fallback to SCHEMA_DEFAULTS if not yet loaded. */
+    let inputSchema = null;
 
     function getSpec(key) {
-      const d = SCHEMA_DEFAULTS[key];
+      const d = (inputSchema && inputSchema[key]) || SCHEMA_DEFAULTS[key];
       return d ? { min: d.min, max: d.max, step: d.step } : { min: 0, max: 1, step: 0.01 };
     }
     function formatLargeNumber(n) {
@@ -253,7 +265,7 @@
       };
     }
     function defaultCluster() {
-      return { cluster_name: '', default_storage_pattern: 'HMA (MMD)', nodes_per_cluster: 3, devices_per_node: 2, device_size_gb: 50, available_memory_gb: 64, overhead_pct: 0.15, nodes_lost: 0 };
+      return { cluster_name: '', default_storage_pattern: 'HMA (MMD)', nodes_per_cluster: 3, devices_per_node: 2, device_size_gb: 50, available_memory_gb: 64, overhead_pct: 0.15, nodes_lost: 0, vcpus: 0, instance_storage: '', instance_networking: '' };
     }
     function flatDefaultsToState(flat) {
       return {
@@ -266,6 +278,9 @@
           available_memory_gb: flat.available_memory_gb ?? 64,
           overhead_pct: flat.overhead_pct ?? 0.15,
           nodes_lost: flat.nodes_lost ?? 0,
+          vcpus: flat.vcpus ?? 0,
+          instance_storage: flat.instance_storage ?? '',
+          instance_networking: flat.instance_networking ?? '',
         },
         namespaces: [{
           name: '',
@@ -319,7 +334,18 @@
         <span class="value"></span>
       </div>`;
       html += '<div class="default-pattern-hint">New namespaces use this until overridden.</div>';
-      CLUSTER_KEYS.forEach(spec => {
+      html += '<div class="thresholds-block"><div class="heading">Server instance specs</div>';
+      INSTANCE_SPEC_KEYS.forEach(spec => {
+        html += renderOneRow(spec, cluster[spec.key], 0, true);
+      });
+      html += `<div class="input-row"><label>Storage</label><input type="text" id="instanceStorage" placeholder="e.g. 1 x 950 GB NVMe" value="${(cluster.instance_storage || '').replace(/"/g, '&quot;')}" style="max-width:14rem;"><span class="value"></span></div>`;
+      html += `<div class="input-row"><label>Networking</label><input type="text" id="instanceNetworking" placeholder="e.g. Up to 10 Gbps" value="${(cluster.instance_networking || '').replace(/"/g, '&quot;')}" style="max-width:14rem;"><span class="value"></span></div>`;
+      html += '</div>';
+      CLUSTER_KEYS_TOPOLOGY.forEach(spec => {
+        html += renderOneRow(spec, cluster[spec.key], 0, true);
+      });
+      html += '<div class="cluster-divider"></div>';
+      CLUSTER_KEYS_RESILIENCE.forEach(spec => {
         html += renderOneRow(spec, cluster[spec.key], 0, true);
       });
       html += '</div>';
@@ -387,6 +413,14 @@
           state.cluster.default_storage_pattern = e.target.value;
         });
       }
+      const instanceStorageEl = el.querySelector('#instanceStorage');
+      if (instanceStorageEl) {
+        instanceStorageEl.addEventListener('input', (e) => { state.cluster.instance_storage = e.target.value; compute(); });
+      }
+      const instanceNetworkingEl = el.querySelector('#instanceNetworking');
+      if (instanceNetworkingEl) {
+        instanceNetworkingEl.addEventListener('input', (e) => { state.cluster.instance_networking = e.target.value; compute(); });
+      }
       el.querySelectorAll('input[type="range"]').forEach(input => {
         input.addEventListener('input', () => {
           if (input.classList.contains('threshold-slider')) return;
@@ -402,7 +436,7 @@
           const ns = input.dataset.ns ?? '';
           const span = el.querySelector(`[data-value="${key}"][data-ns="${ns}"][data-cluster="${input.dataset.cluster}"]`);
           if (span) {
-            const spec = [...CLUSTER_KEYS, ...NAMESPACE_KEYS].find(s => s.key === key);
+            const spec = [...INSTANCE_SPEC_KEYS, ...CLUSTER_KEYS_TOPOLOGY, ...CLUSTER_KEYS_RESILIENCE, ...NAMESPACE_KEYS].find(s => s.key === key);
             span.textContent = formatVal(val, key, spec && spec.log);
           }
           compute();
@@ -499,6 +533,13 @@
       return r.json();
     }
 
+    /** Fetch defaults and slider schema in one request (from config/inputs.json). */
+    async function fetchInputConfig() {
+      const r = await fetch('/api/input-config');
+      if (!r.ok) throw new Error(r.statusText);
+      return r.json();
+    }
+
     function compressionRatioFromPreset(preset) {
       if (preset === 'LZ4') return 0.6;
       if (preset === 'Zstandard') return 0.35;
@@ -516,6 +557,9 @@
           available_memory_gb: state.cluster.available_memory_gb,
           overhead_pct: state.cluster.overhead_pct,
           nodes_lost: state.cluster.nodes_lost,
+          vcpus: state.cluster.vcpus ?? 0,
+          instance_storage: state.cluster.instance_storage ?? '',
+          instance_networking: state.cluster.instance_networking ?? '',
         },
         namespaces: state.namespaces.map(ns => ({
           name: ns.name || '',
@@ -549,18 +593,20 @@
 
     function fmt(n) {
       if (typeof n !== 'number') return n;
-      return n < 1e6 ? n.toFixed(2) : n.toExponential(2);
+      return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     const STORAGE_OVERHEAD_PCT = 0.024;
 
-    function buildShowMyWorkStorage(o) {
+    function buildShowMyWork(o) {
       const dataStoredGb = typeof o.data_stored_gb === 'number' ? o.data_stored_gb : 0;
       const totalAvailGb = typeof o.total_available_storage_gb === 'number' ? o.total_available_storage_gb : 0;
-      const utilPct = typeof o.storage_utilization_pct === 'number' ? o.storage_utilization_pct : 0;
+      const deviceTotalTb = typeof o.device_total_storage_tb === 'number' ? o.device_total_storage_tb : 0;
+      const storageUtilPct = typeof o.storage_utilization_pct === 'number' ? o.storage_utilization_pct : 0;
       const nodes = state.cluster && (state.cluster.nodes_per_cluster != null) ? Number(state.cluster.nodes_per_cluster) : 0;
       const devicesPerNode = state.cluster && (state.cluster.devices_per_node != null) ? Number(state.cluster.devices_per_node) : 0;
       const deviceSizeGb = state.cluster && (state.cluster.device_size_gb != null) ? Number(state.cluster.device_size_gb) : 0;
+      const usableTb = totalAvailGb / 1024;
       const dataStoredFormula = (state.namespaces || []).map(ns => {
         const moc = Number(ns.master_object_count ?? 0);
         const rf = Number(ns.replication_factor ?? 0);
@@ -572,14 +618,46 @@
       const dataStoredFormulaText = (state.namespaces || []).length > 1
         ? 'Σ (Master object count × Replication factor × Avg record size) / 1024³'
         : 'Master object count × Replication factor × Average record size (bytes) / 1024³';
-      return `
+
+      const memUsedBaseGb = typeof o.total_memory_used_base_gb === 'number' ? o.total_memory_used_base_gb : 0;
+      const memTombstonesGb = typeof o.total_memory_tombstones_gb === 'number' ? o.total_memory_tombstones_gb : 0;
+      const availMemClusterGb = typeof o.available_mem_per_cluster_gb === 'number' ? o.available_mem_per_cluster_gb : 0;
+      const memUtilBasePct = typeof o.memory_utilization_base_pct === 'number' ? o.memory_utilization_base_pct : 0;
+      const memUtilTombsPct = typeof o.memory_utilization_with_tombstones_pct === 'number' ? o.memory_utilization_with_tombstones_pct : 0;
+      const memWithTombsGb = memUsedBaseGb + memTombstonesGb;
+
+      const nodesLost = state.cluster && state.cluster.nodes_lost != null ? Number(state.cluster.nodes_lost) : 0;
+      const effectiveNodes = typeof o.effective_nodes === 'number' ? o.effective_nodes : Math.max(0, nodes - nodesLost);
+      const failureAvailStorageGb = typeof o.failure_total_available_storage_gb === 'number' ? o.failure_total_available_storage_gb : 0;
+      const failureStorageUtilPct = typeof o.failure_storage_utilization_pct === 'number' ? o.failure_storage_utilization_pct : 0;
+      const failureMemUsedGb = typeof o.failure_memory_used_gb === 'number' ? o.failure_memory_used_gb : 0;
+      const failureMemUtilPct = typeof o.failure_memory_utilization_pct === 'number' ? o.failure_memory_utilization_pct : 0;
+      const failureAvailMemGb = effectiveNodes > 0 && availMemClusterGb > 0 ? (availMemClusterGb / nodes) * effectiveNodes : 0;
+
+      const storageSection = `
         <div class="show-my-work-section">
           <strong><span class="show-my-work-var">Storage utilization %</span></strong>
-          <div class="show-my-work-line"><span class="show-my-work-var">Actual Storage Utilization</span> = Total Data Stored (GB) / Total Storage available per cluster (GB) = ${fmt(dataStoredGb)} / ${fmt(totalAvailGb)} = ${fmt(utilPct)}%</div>
-          <div class="show-my-work-line"><span class="show-my-work-var">Data Stored (GB)</span> = ${dataStoredFormulaText} = ${fmt(dataStoredGbFromFormula)}</div>
-          <div class="show-my-work-line"><span class="show-my-work-var">Total Available Storage (GB)</span> = Nodes per cluster × Devices per node × Device size (GB) × (1 − Cluster storage overhead pct) = ${nodes} × ${devicesPerNode} × ${deviceSizeGb} × (1 − ${(STORAGE_OVERHEAD_PCT * 100).toFixed(1)}%) = ${fmt(totalAvailGb)}</div>
-        </div>
-      `;
+          <div class="show-my-work-line">Utilization uses <strong>usable</strong> storage (after overhead), not raw device total. So the denominator below is smaller than raw, and the % is higher than Data stored ÷ Device total (TB).</div>
+          <div class="show-my-work-line"><span class="show-my-work-var">Device total (raw)</span> = ${fmt(deviceTotalTb)} TB — same as &quot;Device total storage (TB)&quot; in Outputs.</div>
+          <div class="show-my-work-line"><span class="show-my-work-var">Usable storage</span> = Device total × (1 − ${(STORAGE_OVERHEAD_PCT * 100).toFixed(1)}% overhead) = ${fmt(usableTb)} TB = ${fmt(totalAvailGb)} GB.</div>
+          <div class="show-my-work-line"><span class="show-my-work-var">Storage utilization %</span> = Data stored (GB) ÷ Usable storage (GB) = ${fmt(dataStoredGb)} ÷ ${fmt(totalAvailGb)} = ${fmt(storageUtilPct)}%</div>
+          <div class="show-my-work-line"><span class="show-my-work-var">Data stored (GB)</span> = ${dataStoredFormulaText} = ${fmt(dataStoredGbFromFormula)}</div>
+        </div>`;
+      const memorySection = `
+        <div class="show-my-work-section">
+          <strong><span class="show-my-work-var">Memory utilization %</span></strong>
+          <div class="show-my-work-line"><span class="show-my-work-var">Available mem per cluster</span> = Nodes × Available memory after overhead per node = ${fmt(availMemClusterGb)} GB.</div>
+          <div class="show-my-work-line"><span class="show-my-work-var">Memory utilization (base) %</span> = Total memory used base (GB) ÷ Available mem per cluster (GB) = ${fmt(memUsedBaseGb)} ÷ ${fmt(availMemClusterGb)} = ${fmt(memUtilBasePct)}%</div>
+          <div class="show-my-work-line"><span class="show-my-work-var">Memory utilization (w/ tombstones) %</span> = (Total memory used base + Tombstones) ÷ Available mem = (${fmt(memUsedBaseGb)} + ${fmt(memTombstonesGb)}) ÷ ${fmt(availMemClusterGb)} = ${fmt(memWithTombsGb)} ÷ ${fmt(availMemClusterGb)} = ${fmt(memUtilTombsPct)}%</div>
+        </div>`;
+      const failureSection = `
+        <div class="show-my-work-section">
+          <strong><span class="show-my-work-var">Failure scenario</span> (${nodesLost} nodes lost)</strong>
+          <div class="show-my-work-line"><span class="show-my-work-var">Effective nodes</span> = Nodes − Nodes lost = ${nodes} − ${nodesLost} = ${fmt(effectiveNodes)}</div>
+          <div class="show-my-work-line"><span class="show-my-work-var">Failure storage utilization %</span> = Data stored (GB) ÷ Failure usable storage (GB) = ${fmt(dataStoredGb)} ÷ ${fmt(failureAvailStorageGb)} = ${fmt(failureStorageUtilPct)}%</div>
+          <div class="show-my-work-line"><span class="show-my-work-var">Failure memory utilization %</span> = Memory used (GB) ÷ (Effective nodes × Available mem per node) = ${fmt(failureMemUsedGb)} ÷ ${fmt(failureAvailMemGb)} = ${fmt(failureMemUtilPct)}%</div>
+        </div>`;
+      return storageSection + memorySection + failureSection;
     }
 
     function renderOutputs(o) {
@@ -592,9 +670,8 @@
           <div class="output-card">
             <div class="output-card-title">Storage</div>
             <div class="output-row primary"><span class="k">Storage utilization %</span><span class="v">${fmt(o.storage_utilization_pct)}%</span></div>
-            <div class="output-row"><span class="k">Data stored (GB)</span><span class="v">${fmt(o.data_stored_gb)}</span></div>
+            <div class="output-row"><span class="k">Data stored (TB)</span><span class="v">${fmt(o.data_stored_gb / 1024)}</span></div>
             <div class="output-row"><span class="k">Device total storage (TB)</span><span class="v">${fmt(o.device_total_storage_tb)}</span></div>
-            <div class="output-row"><span class="k">Total available storage (GB)</span><span class="v">${fmt(o.total_available_storage_gb)}</span></div>
             <div class="output-row"><span class="k">Total device count</span><span class="v">${fmt(o.total_device_count)}</span></div>
           </div>
           <div class="output-card">
@@ -641,7 +718,7 @@
       `;
       const showMyWorkEl = document.getElementById('showMyWorkContent');
       if (showMyWorkEl) {
-        showMyWorkEl.innerHTML = buildShowMyWorkStorage(o);
+        showMyWorkEl.innerHTML = buildShowMyWork(o);
         showMyWorkEl.classList.remove('placeholder');
       }
     }
@@ -709,8 +786,14 @@
     });
 
     (async () => {
-      const flat = await fetchDefaults();
-      state = flatDefaultsToState(flat);
+      try {
+        const config = await fetchInputConfig();
+        if (config.schema) inputSchema = config.schema;
+        state = flatDefaultsToState(config.defaults || {});
+      } catch (e) {
+        const flat = await fetchDefaults();
+        state = flatDefaultsToState(flat);
+      }
       renderInputs();
       await compute();
     })();

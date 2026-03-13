@@ -156,6 +156,6 @@ So: **only data on device** (DATA='D') contributes to the numerator; PI/SI on di
 - [ ] **API (app/main.py):** Extend ClusterBody and NamespaceBody to accept all new fields; map to model; return new outputs.
 - [ ] **Ingest / load-collectinfo:** Populate cluster + namespaces from bundle using the same parsing logic as test_derivations_mem_util.sh (and the collectinfo sections of the two model docs).
 - [ ] **UI (app/static/index.html):** Send all cluster and namespace fields in the compute-v2 payload; display storage_utilization_pct and memory_utilization_* from response; keep Parameter help and Show my work in sync with the model docs.
-- [ ] **Calculation spreadsheet:** Update [CALCULATION_SPREADSHEET.md](CALCULATION_SPREADSHEET.md) so Storage utilization % and Memory utilization % sections match the formulas in the model docs (including MaxDataPct, only-data-on-device, and memory with/without tombstones).
+- [ ] **Calculations doc:** [CALCULATIONS.md](CALCULATIONS.md) matches model docs for Storage % and Memory % (input situations and formula flow). Use it when validating or changing formulas.
 
-No code changes until the calculation spreadsheet is correct; this doc defines the target process and data flow.
+This doc defines the target process and data flow; calculation details live in CALCULATIONS.md and the model docs.

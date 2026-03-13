@@ -2,7 +2,7 @@
 
 Dynamic Aerospike capacity planning tool: experiment with inputs (topology, workload, resilience) and see utilization and performance estimates in real time. Load inputs from manual entry, defaults, or a collectinfo bundle; export configurations for sharing.
 
-**Scope:** Multi-namespace supported (cluster + namespaces; Add/Remove namespace in UI). Cluster has a default storage pattern; each namespace has storage pattern (HMA, In-Memory, All Flash, DMD, Custom), compression, and capacity thresholds. Column 3: **Parameter help** (click a parameter label) and **Show my work** (step-by-step storage utilization). **Stack:** Web UI (HTML/JS) + Python backend (FastAPI).
+**Scope:** Multi-namespace supported (cluster + namespaces; Add/Remove namespace in UI). Cluster has **Server instance specs** (vCPUs, RAM, Storage, Networking—for mapping cloud instance types; only RAM affects calculations), default storage pattern, topology, and resilience. Each namespace has storage pattern (HMA, In-Memory, All Flash, DMD, Custom), compression, and capacity thresholds. Defaults and slider ranges come from **config/inputs.json**. Column 3: **Parameter help** (click a parameter label) and **Show my work** (Storage, Memory, and Failure sections). **Stack:** Web UI (HTML/JS) + Python backend (FastAPI).
 
 ## Requirements
 
@@ -32,10 +32,12 @@ Then open **http://127.0.0.1:8000** in a browser.
 
 ## Using the app
 
-- **Inputs:** Use sliders to change topology, memory, workload, and resilience; outputs update immediately.
-- **Load from defaults:** Resets all inputs to safe minimums and refreshes outputs.
+- **Inputs:** Use sliders and fields to change Cluster (Server instance specs, topology, Nodes lost) and per-namespace workload; outputs update immediately. Defaults and slider ranges are from [config/inputs.json](config/inputs.json).
+- **Load from defaults:** Resets all inputs to config defaults and refreshes outputs.
 - **Load from collectinfo:** Upload a bundle (**.zip**, **.tgz**, or **.tar**) or a collectinfo file; the button shows "Loading…" while the request runs. The app uses **asadm** to parse bundles; asadm must be on PATH. Namespaces with no device (e.g. in-memory-only) get storage pattern In-Memory (MMM) and contribute 0 to device storage; Device Total is parsed as TB or GB from the summary. Optional: set **`CAPACITRON_NAMESPACE`** to choose a namespace when the bundle has multiple. See [docs/COLLECTINFO_INPUT_MAPPING.md](docs/COLLECTINFO_INPUT_MAPPING.md).
 - **Export:** Downloads a JSON file with all current inputs and outputs (standard output format) for storage or sharing.
+
+**Customizing defaults and sliders:** Edit [config/inputs.json](config/inputs.json). The `defaults` object sets default values for all inputs; the `sliders` object sets `min`, `max`, and `step` for each UI slider. Restart the app after editing. See [config/README.md](config/README.md).
 
 ## Run tests
 
@@ -52,7 +54,9 @@ PYTHONPATH=. python -m pytest tests/ -v
 - [docs/SESSION_LOG.md](docs/SESSION_LOG.md) – Per-session work log.
 - [docs/COLLECTINFO_INPUT_MAPPING.md](docs/COLLECTINFO_INPUT_MAPPING.md) – How Load from collectinfo maps bundle data to inputs.
 - [docs/API_MULTI_NAMESPACE.md](docs/API_MULTI_NAMESPACE.md) – Multi-namespace API (POST /api/compute-v2).
-- [docs/CALCULATION_CATALOG.md](docs/CALCULATION_CATALOG.md) – All calculations (Primary/SI memory, storage, utilization).
+- [docs/CALCULATIONS.md](docs/CALCULATIONS.md) – Source of truth for capacity calculations (storage, memory, failure).
+- [docs/CALCULATION_CATALOG.md](docs/CALCULATION_CATALOG.md) – Workbook/cell traceability for calculations.
+- [config/README.md](config/README.md) – Customizing defaults and sliders.
 - [PLAN.md](PLAN.md) – Design, scope, and roadmap.
 
 Contributors: see [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming and push workflow.

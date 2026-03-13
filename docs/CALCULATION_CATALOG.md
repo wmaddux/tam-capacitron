@@ -39,7 +39,7 @@ All capacity calculations implemented in this application are derived from two s
 | RECORD_METADATA_BYTES | — | 64 | Primary Index Shmem: 64 bytes per replicated object |
 | SI_ENTRY_SIZE_BYTES (S) | — | 32 | Average SI entry size (bytes); collectinfo-style |
 | SI_FILL_FACTOR (F) | — | 0.75 | SI index fill factor (0–1) |
-| SI_CUSHION_PER_INDEX_PER_NODE_BYTES (H) | — | 41,943,040 | Fixed cushion per index per node (~40 MiB); collectinfo-style |
+| SI_CUSHION_PER_INDEX_PER_NODE_BYTES (H) | — | 16,777,216 | Fixed cushion per index per node (16 MiB); collectinfo-style |
 | (others) | C40, C41, C42 | 21, 0.75, 16 | Used in memory/storage limits |
 
 ### Calculations (calcManual and related)
