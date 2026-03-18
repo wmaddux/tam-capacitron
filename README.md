@@ -2,6 +2,8 @@
 
 Dynamic Aerospike capacity planning tool: experiment with inputs (topology, workload, resilience) and see utilization and performance estimates in real time. Load inputs from manual entry, defaults, or a collectinfo bundle; export configurations for sharing.
 
+When importing from collectinfo, only the inputs are affected. Downstream calculations are based on inputs (not direct results from CI). That way certain calculations can be compared and validated against actual CI results. 
+
 **Scope:** Multi-namespace supported (cluster + namespaces; Add/Remove namespace in UI). Cluster has **Server instance specs** (vCPUs, RAM, Storage, Networking—for mapping cloud instance types; only RAM affects calculations), default storage pattern, topology, and resilience. Each namespace has storage pattern (HMA, In-Memory, All Flash, DMD, Custom), compression, and capacity thresholds. Defaults and slider ranges come from **config/inputs.json**. Column 3: **Parameter help** (click a parameter label) and **Show my work** (Storage, Memory, and Failure sections). **Stack:** Web UI (HTML/JS) + Python backend (FastAPI).
 
 ## Requirements
