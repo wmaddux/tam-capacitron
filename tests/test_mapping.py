@@ -101,6 +101,8 @@ def test_ingestor_multi_to_cluster_and_namespaces():
     assert "namespaces" in out
     assert out["cluster"]["nodes_per_cluster"] == 9.0
     assert out["cluster"]["devices_per_node"] == 2.0
+    assert out["cluster"]["iops_per_disk_k"] == 320.0
+    assert out["cluster"]["throughput_per_disk_mbs"] == 1500.0
     assert len(out["namespaces"]) == 1
     assert out["namespaces"][0]["name"] == "ns1"
     assert out["namespaces"][0]["replication_factor"] == 2.0

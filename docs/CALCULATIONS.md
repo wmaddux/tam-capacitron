@@ -11,7 +11,7 @@ The letters in parentheses **(S)**, **(F)**, **(H)** are the symbols used in the
 | Name | Value | Used in |
 |------|-------|--------|
 | BytesPerGB | 1024³ | Data bytes → GB; system memory budget |
-| StorageOverheadPct / FRAGMENTATION_FACTOR | 0.024 | Usable device capacity (1 − this) × raw |
+| StorageOverheadPct / FRAGMENTATION_FACTOR | 0.024 | Usable device capacity (1 − this) × raw. Source: Capacity planner spreadsheet cell C23; defined in `core/formulas.py`. |
 | RECORD_METADATA_BYTES | 64 | Primary Index Shmem: 64 bytes per replicated object |
 | SI_ENTRY_SIZE_BYTES (S) | 32 | Secondary index entry size (bytes) |
 | SI_FILL_FACTOR (F) | 0.75 | SI index fill factor (0–1) |
@@ -66,8 +66,8 @@ Sum over namespaces: **TotalDeviceDataGB_all_ns** = sum over all ns of DeviceDat
 
 ### Implemented in
 
-`core/formulas.py`: `total_usable_storage_cluster_gb` (denominator; app uses fragmentation factor for overhead), `storage_utilization_pct`.  
-`core/engine.py`: Per-namespace data size and placement; aggregation of storage contribution (PI + SI + data on D); then `storage_utilization_pct(total_storage_used_gb, total_usable_storage_gb)`. The model doc defines the numerator as data-on-device only; the engine uses placement-aware total storage used (PI/SI/data on D) for the numerator.
+`core/formulas.py`: `total_usable_storage_cluster_gb` (denominator; app uses FRAGMENTATION_FACTOR for overhead), `storage_utilization_pct`. A second output **Storage utilization % with thresholds** uses denominator = total_usable_storage_gb × (MaxDataPct / 100) with MaxDataPct = min(stop_writes_at_storage_pct, 100 − min_available_storage_pct) (min across namespaces); see `usable_storage_with_max_data_pct`, `storage_utilization_with_thresholds_pct`.  
+`core/engine.py`: Per-namespace data size and placement; aggregation of storage contribution (PI + SI + data on D); then `storage_utilization_pct(total_storage_used_gb, total_usable_storage_gb)`. Engine also computes `storage_utilization_with_thresholds_pct` and `usable_storage_with_thresholds_gb`. The model doc defines the numerator as data-on-device only; the engine uses placement-aware total storage used (PI/SI/data on D) for the numerator.
 
 ---
 
@@ -137,6 +137,43 @@ Same formulas as the healthy cluster, but the denominator uses **effective nodes
 - **Failure memory utilization %** = 100 × (total memory used GB) ÷ (effective_nodes × available memory after overhead per node)
 
 Implemented in: `failure_usable_storage_gb`, `failure_storage_utilization_pct`; engine uses same aggregated totals with failure denominators.
+
+---
+
+## Data growth
+
+**Input:** Cluster-level **data_growth_pct_per_year** (annual growth rate, %).
+
+**Outputs:**
+
+- **Projected data (1 yr, GB)** = current data_stored_gb × (1 + data_growth_pct_per_year / 100).
+- **Headroom to stop-writes %** = 100 × (usable_storage_with_thresholds_gb − data_stored_gb) / usable_storage_with_thresholds_gb. Uses the same threshold-based usable storage as “Storage utilization % with thresholds”. None when usable_storage_with_thresholds_gb ≤ 0.
+- **Months to stop-writes (est)** = 12 × log(limit_gb / data_stored_gb) / log(1 + data_growth_pct_per_year/100) when growth > 0 and limit > current data; else None.
+
+Implemented in: `core/engine.py` (`_projected_data_1yr_gb`, `_headroom_to_stop_writes_pct`, `_months_to_stop_writes_est`).
+
+---
+
+## Performance (Capacity planner v3.0)
+
+**Source:** Copy of Capacity planner v3.0 - &lt;customer&gt; spreadsheet.
+
+**Inputs:** Cluster: **IOPS per disk (K)**, **Throughput per disk (MB/s)**. Effective **Avg Read pct**, **Avg Write pct**, **Average record size (bytes)** from namespaces (weighted average by data_stored_gb).
+
+**Outputs and formulas:**
+
+| Output | Formula |
+|--------|--------|
+| Total IOPS per Node (K) | Devices per node × IOPS per disk (K) |
+| Estimated IOPS (K) per cluster | Nodes per cluster × Total IOPS per Node (K) |
+| Reads per second (k) | Avg Read pct × Estimated IOPS (K) per cluster |
+| Writes per second (k) | Avg Write pct × Estimated IOPS (K) per cluster |
+| Read Bandwidth (MB/s) | Reads per second (k) × 1000 × Avg record size (bytes) / 1024² |
+| Write Bandwidth (MB/s) | Writes per second (k) × 1000 × Avg record size (bytes) / 1024² |
+| Total Throughput per Node (MB/s) | Devices per node × Throughput per disk (MB/s) |
+| Peak Throughput per cluster (MB/s) | Total Throughput per Node (MB/s) × Nodes per cluster |
+
+Implemented in: `core/formulas.py` (performance functions), `core/engine.py` (effective read/write/record size; aggregation).
 
 ---
 

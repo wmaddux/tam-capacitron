@@ -64,6 +64,19 @@ All capacity calculations implemented in this application are derived from two s
 | Failure usable storage (GB) | `failure_usable_storage_gb` | Effective nodes × devices per node × device size GB × (1 − fragmentation factor) | C71 = (C6−C46)×C7×C8×(1−C23) |
 | Failure storage utilization (%) | `failure_storage_utilization_pct` | 100 × (data stored GB ÷ failure total available storage GB) | Same as healthy, with failure available |
 
+### Performance (Capacity planner v3.0 – customer spreadsheet)
+
+| Calculation | Application function | Formula (business terms) | Source |
+|-------------|----------------------|--------------------------|--------|
+| Total IOPS per Node (K) | `total_iops_per_node_k` | Devices per node × IOPS per disk (K) | Capacity planner v3.0 Performance |
+| Estimated IOPS (K) per cluster | `estimated_iops_per_cluster_k` | Nodes per cluster × Total IOPS per Node (K) | Capacity planner v3.0 Performance |
+| Reads per second (k) | `reads_per_second_k` | Avg Read pct × Estimated IOPS (K) per cluster | Capacity planner v3.0 Performance |
+| Writes per second (k) | `writes_per_second_k` | Avg Write pct × Estimated IOPS (K) per cluster | Capacity planner v3.0 Performance |
+| Read Bandwidth (MB/s) | `read_bandwidth_mbs` | Reads per second (k) × 1000 × Avg record size / 1024² | Capacity planner v3.0 Performance |
+| Write Bandwidth (MB/s) | `write_bandwidth_mbs` | Writes per second (k) × 1000 × Avg record size / 1024² | Capacity planner v3.0 Performance |
+| Total Throughput per Node (MB/s) | `total_throughput_per_node_mbs` | Devices per node × Throughput per disk (MB/s) | Capacity planner v3.0 Performance |
+| Peak Throughput per cluster (MB/s) | `peak_throughput_per_cluster_mbs` | Total Throughput per Node (MB/s) × Nodes per cluster | Capacity planner v3.0 Performance |
+
 ### Placement-aware capacity (memory vs storage by primary / SI / data)
 
 Per-namespace placement determines where primary index (PI), secondary index (SI), and data live: **M** = in memory (shmem for indexes), **D** = on device (storage).

@@ -7,10 +7,13 @@ This document records how **CapacityInputs** are populated when loading from col
 | Parameter | Source | asadm / parser | Notes |
 |-----------|--------|----------------|-------|
 | **replication_factor** | Direct | Namespace Summary → Replication Factors | 1:1. |
+| **cluster_name** | Direct | Cluster Summary → Cluster Name | Populated when present; UI shows it in Cluster card. |
 | **nodes_per_cluster** | Direct | Cluster Summary → Cluster Size | 1:1. |
 | **devices_per_node** | Direct | Cluster Summary → Devices Per-Node | 1:1. |
 | **device_size_gb** | Derived | (Device Total × 1024 if TB, else as-is) / Devices Total | Cluster Summary "Device Total" may be TB or GB; parser is unit-aware. |
-| **available_memory_gb** | From summary or default | "Memory (Data + Indexes) Total" or "Memory Total" (TB/GB) / nodes | Default 64 if not in summary. |
+| **available_memory_gb** | From summary or derived | "Memory (Data + Indexes) Total" or "Memory Total" (TB/GB) / nodes; else 7.x: system_free_mem_kbytes / (system_free_mem_pct/100) per node, mean in GB | When summary has no Memory Total, ingest derives from `show statistics like system_free_mem -flip`. |
+| **iops_per_disk_k** | Fixed when loading | Not from bundle | Mapping sets **320** (K) when loading from collectinfo. |
+| **throughput_per_disk_mbs** | Fixed when loading | Not from bundle | Mapping sets **1500** (MB/s) when loading from collectinfo. |
 | **overhead_pct** | Default | Not in asadm summary | Default 0.15. |
 | **master_object_count** | Direct | Namespace Summary → Master/Objects (K/M/G parsed) | 1:1. |
 | **avg_record_size_bytes** | Calculated | data_used_bytes / (master_object_count × replication_factor) | Per-namespace from show stat device_data_bytes/device_used_bytes. When master_object_count is 0 or namespace has no device (drives_total = 0), mapping sets 0 so the namespace contributes 0 to device storage. |
@@ -37,11 +40,14 @@ The mapping layer expects a **dict** from the ingestor with these keys (all opti
 | CapacityInput | Ingestor key(s) or formula |
 |---------------|----------------------------|
 | replication_factor | `replication_factor` |
+| cluster_name | `cluster_name` (from Cluster Summary "Cluster Name") |
 | nodes_per_cluster | `nodes_per_cluster` |
 | devices_per_node | `devices_per_node` |
 | device_size_gb | `device_size_gb` |
-| available_memory_gb | `available_memory_gb` (default 64) |
+| available_memory_gb | `available_memory_gb` (from summary or derived from system_free_mem) |
 | overhead_pct | default 0.15 |
+| iops_per_disk_k | 320 (fixed when loading from collectinfo) |
+| throughput_per_disk_mbs | 1500 (fixed when loading from collectinfo) |
 | master_object_count | `object_count` or `master_object_count` |
 | avg_record_size_bytes | `data_used_bytes / (object_count * replication_factor)` in mapping |
 | read_pct | `read_pct` (from Cache Read%) |

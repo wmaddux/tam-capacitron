@@ -20,8 +20,8 @@
     .toolbar { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
     .toolbar button { padding: 0.4rem 0.75rem; background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
     .toolbar button:hover { border-color: var(--accent); }
-    .layout { display: grid; grid-template-columns: 1fr 1fr minmax(660px, 840px); gap: 1rem; max-width: 2200px; }
-    @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } }
+    .layout { display: grid; grid-template-columns: 480px 480px minmax(0, 1fr); gap: 1rem; max-width: 2200px; }
+    @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
     .panel { background: var(--card); border-radius: 8px; padding: 0.75rem 1rem; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
     .panel h2 { font-size: 0.7rem; margin: 0 0 0.5rem 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
     .input-card { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.75rem; margin-bottom: 0.75rem; }
@@ -87,6 +87,7 @@
     .show-my-work-line { margin-bottom: 0.4rem; word-break: break-word; }
     .show-my-work-var { font-weight: 600; }
     .cluster-divider { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }
+    .cluster-subsection-heading { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; }
   </style>
 </head>
 <body>
@@ -128,12 +129,17 @@
       { key: 'nodes_per_cluster', label: 'Nodes per cluster', log: false },
       { key: 'devices_per_node', label: 'Devices per node', log: false },
       { key: 'device_size_gb', label: 'Device size (GB)', log: false },
+    ];
+    const CLUSTER_KEYS_OVERHEAD_PERF = [
       { key: 'overhead_pct', label: 'Overhead %', log: false },
+      { key: 'iops_per_disk_k', label: 'IOPS per disk (K)', log: false },
+      { key: 'throughput_per_disk_mbs', label: 'Throughput per disk (MB/s)', log: false },
     ];
     const CLUSTER_KEYS_RESILIENCE = [
       { key: 'nodes_lost', label: 'Nodes lost (failure)', log: false },
+      { key: 'data_growth_pct_per_year', label: 'Data growth (%/year)', log: false },
     ];
-    const CLUSTER_KEYS = [...CLUSTER_KEYS_TOPOLOGY, ...CLUSTER_KEYS_RESILIENCE];
+    const CLUSTER_KEYS = [...CLUSTER_KEYS_TOPOLOGY, ...CLUSTER_KEYS_OVERHEAD_PERF, ...CLUSTER_KEYS_RESILIENCE];
     const NAMESPACE_KEYS = [
       { key: 'replication_factor', label: 'Replication factor', log: false },
       { key: 'master_object_count', label: 'Master object count', log: true },
@@ -160,6 +166,9 @@
       si_count: { min: 0, max: 20, step: 1 },
       si_entries_per_object: { min: 0, max: 10, step: 0.1 },
       nodes_lost: { min: 0, max: 16, step: 1 },
+      data_growth_pct_per_year: { min: 0, max: 100, step: 1 },
+      iops_per_disk_k: { min: 0, max: 1000, step: 1 },
+      throughput_per_disk_mbs: { min: 0, max: 3000, step: 1 },
     };
     const PARAM_HELP = {
       replication_factor: 'Number of copies of each record across the cluster. Higher values improve availability but use more storage and memory.',
@@ -176,6 +185,9 @@
       si_count: 'Number of secondary indexes on the namespace. Each index adds memory and storage overhead.',
       si_entries_per_object: 'Average secondary index entries per object. With SI count, affects memory and storage for indexes.',
       nodes_lost: 'Number of nodes assumed lost in the failure scenario. Used to compute effective nodes and failure utilization.',
+      data_growth_pct_per_year: 'Annual data growth rate (%). Used for projected data at 1 yr and estimated months to stop-writes.',
+      iops_per_disk_k: 'IOPS per disk in thousands (K). With devices per node, determines Total IOPS per node and cluster.',
+      throughput_per_disk_mbs: 'Throughput per disk (MB/s). With devices per node, determines Total/Peak throughput.',
       default_storage_pattern: 'New namespaces inherit this pattern (HMA, In-Memory, All Flash, DMD) until overridden per namespace.',
       vcpus: 'Virtual CPUs per node (from cloud instance type). For reference only; not used in calculations yet.',
     };
@@ -265,7 +277,13 @@
       };
     }
     function defaultCluster() {
-      return { cluster_name: '', default_storage_pattern: 'HMA (MMD)', nodes_per_cluster: 3, devices_per_node: 2, device_size_gb: 50, available_memory_gb: 64, overhead_pct: 0.15, nodes_lost: 0, vcpus: 0, instance_storage: '', instance_networking: '' };
+      return { cluster_name: '', default_storage_pattern: 'HMA (MMD)', nodes_per_cluster: 3, devices_per_node: 2, device_size_gb: 50, available_memory_gb: 64, overhead_pct: 0.15, nodes_lost: 0, data_growth_pct_per_year: 0, vcpus: 0, instance_storage: '', instance_networking: '', iops_per_disk_k: 320, throughput_per_disk_mbs: 1500 };
+    }
+    function defaultsClusterAndNamespacesToState(defaults) {
+      const cluster = { ...defaultCluster(), ...defaults.cluster };
+      const pattern = cluster.default_storage_pattern || 'HMA (MMD)';
+      const namespaces = (defaults.namespaces || []).map(n => ({ ...defaultNamespace(pattern), ...n }));
+      return { cluster, namespaces: namespaces.length ? namespaces : [defaultNamespace(pattern)] };
     }
     function flatDefaultsToState(flat) {
       return {
@@ -278,9 +296,12 @@
           available_memory_gb: flat.available_memory_gb ?? 64,
           overhead_pct: flat.overhead_pct ?? 0.15,
           nodes_lost: flat.nodes_lost ?? 0,
+          data_growth_pct_per_year: flat.data_growth_pct_per_year ?? 0,
           vcpus: flat.vcpus ?? 0,
           instance_storage: flat.instance_storage ?? '',
           instance_networking: flat.instance_networking ?? '',
+          iops_per_disk_k: flat.iops_per_disk_k ?? 320,
+          throughput_per_disk_mbs: flat.throughput_per_disk_mbs ?? 1500,
         },
         namespaces: [{
           name: '',
@@ -342,6 +363,10 @@
       html += `<div class="input-row"><label>Networking</label><input type="text" id="instanceNetworking" placeholder="e.g. Up to 10 Gbps" value="${(cluster.instance_networking || '').replace(/"/g, '&quot;')}" style="max-width:14rem;"><span class="value"></span></div>`;
       html += '</div>';
       CLUSTER_KEYS_TOPOLOGY.forEach(spec => {
+        html += renderOneRow(spec, cluster[spec.key], 0, true);
+      });
+      html += '<div class="cluster-divider"></div><div class="cluster-subsection-heading">Overhead &amp; performance</div>';
+      CLUSTER_KEYS_OVERHEAD_PERF.forEach(spec => {
         html += renderOneRow(spec, cluster[spec.key], 0, true);
       });
       html += '<div class="cluster-divider"></div>';
@@ -436,7 +461,7 @@
           const ns = input.dataset.ns ?? '';
           const span = el.querySelector(`[data-value="${key}"][data-ns="${ns}"][data-cluster="${input.dataset.cluster}"]`);
           if (span) {
-            const spec = [...INSTANCE_SPEC_KEYS, ...CLUSTER_KEYS_TOPOLOGY, ...CLUSTER_KEYS_RESILIENCE, ...NAMESPACE_KEYS].find(s => s.key === key);
+            const spec = [...INSTANCE_SPEC_KEYS, ...CLUSTER_KEYS_TOPOLOGY, ...CLUSTER_KEYS_OVERHEAD_PERF, ...CLUSTER_KEYS_RESILIENCE, ...NAMESPACE_KEYS].find(s => s.key === key);
             span.textContent = formatVal(val, key, spec && spec.log);
           }
           compute();
@@ -557,9 +582,12 @@
           available_memory_gb: state.cluster.available_memory_gb,
           overhead_pct: state.cluster.overhead_pct,
           nodes_lost: state.cluster.nodes_lost,
+          data_growth_pct_per_year: state.cluster.data_growth_pct_per_year ?? 0,
           vcpus: state.cluster.vcpus ?? 0,
           instance_storage: state.cluster.instance_storage ?? '',
           instance_networking: state.cluster.instance_networking ?? '',
+          iops_per_disk_k: state.cluster.iops_per_disk_k ?? 320,
+          throughput_per_disk_mbs: state.cluster.throughput_per_disk_mbs ?? 1500,
         },
         namespaces: state.namespaces.map(ns => ({
           name: ns.name || '',
@@ -596,16 +624,31 @@
       return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    const STORAGE_OVERHEAD_PCT = 0.024;
+    // Fixed constants (match core/formulas.py); shown in Show my work where used
+    const FRAGMENTATION_FACTOR = 0.024;
+    const RECORD_METADATA_BYTES = 64;
+    const SI_ENTRY_SIZE_BYTES = 32;
+    const SI_FILL_FACTOR = 0.75;
+    const SI_CUSHION_MIB = 16;
 
     function buildShowMyWork(o) {
       const dataStoredGb = typeof o.data_stored_gb === 'number' ? o.data_stored_gb : 0;
       const totalAvailGb = typeof o.total_available_storage_gb === 'number' ? o.total_available_storage_gb : 0;
       const deviceTotalTb = typeof o.device_total_storage_tb === 'number' ? o.device_total_storage_tb : 0;
       const storageUtilPct = typeof o.storage_utilization_pct === 'number' ? o.storage_utilization_pct : 0;
+      const storageUtilThresholdsPct = typeof o.storage_utilization_with_thresholds_pct === 'number' ? o.storage_utilization_with_thresholds_pct : null;
+      const usableWithThresholdsGb = typeof o.usable_storage_with_thresholds_gb === 'number' ? o.usable_storage_with_thresholds_gb : 0;
+      const totalStorageUsedGb = typeof o.total_storage_used_gb === 'number' ? o.total_storage_used_gb : dataStoredGb;
       const nodes = state.cluster && (state.cluster.nodes_per_cluster != null) ? Number(state.cluster.nodes_per_cluster) : 0;
       const devicesPerNode = state.cluster && (state.cluster.devices_per_node != null) ? Number(state.cluster.devices_per_node) : 0;
       const deviceSizeGb = state.cluster && (state.cluster.device_size_gb != null) ? Number(state.cluster.device_size_gb) : 0;
+      let maxDataPct = 100;
+      (state.namespaces || []).forEach(ns => {
+        const stop = Number(ns.stop_writes_at_storage_pct ?? 90);
+        const minAvail = Number(ns.min_available_storage_pct ?? 5);
+        const pct = Math.min(stop, 100 - minAvail);
+        if (pct < maxDataPct) maxDataPct = pct;
+      });
       const usableTb = totalAvailGb / 1024;
       const dataStoredFormula = (state.namespaces || []).map(ns => {
         const moc = Number(ns.master_object_count ?? 0);
@@ -637,16 +680,21 @@
       const storageSection = `
         <div class="show-my-work-section">
           <strong><span class="show-my-work-var">Storage utilization %</span></strong>
-          <div class="show-my-work-line">Utilization uses <strong>usable</strong> storage (after overhead), not raw device total. So the denominator below is smaller than raw, and the % is higher than Data stored ÷ Device total (TB).</div>
+          <div class="show-my-work-line">Utilization uses <strong>usable</strong> storage (after overhead), not raw device total. Fixed constant: <span class="show-my-work-var">FRAGMENTATION_FACTOR</span> = ${FRAGMENTATION_FACTOR} (${(FRAGMENTATION_FACTOR * 100).toFixed(1)}%); (1 − this) = usable fraction.</div>
           <div class="show-my-work-line"><span class="show-my-work-var">Device total (raw)</span> = ${fmt(deviceTotalTb)} TB — same as &quot;Device total storage (TB)&quot; in Outputs.</div>
-          <div class="show-my-work-line"><span class="show-my-work-var">Usable storage</span> = Device total × (1 − ${(STORAGE_OVERHEAD_PCT * 100).toFixed(1)}% overhead) = ${fmt(usableTb)} TB = ${fmt(totalAvailGb)} GB.</div>
-          <div class="show-my-work-line"><span class="show-my-work-var">Storage utilization %</span> = Data stored (GB) ÷ Usable storage (GB) = ${fmt(dataStoredGb)} ÷ ${fmt(totalAvailGb)} = ${fmt(storageUtilPct)}%</div>
+          <div class="show-my-work-line"><span class="show-my-work-var">Usable storage</span> = Device total × (1 − FRAGMENTATION_FACTOR) = ${fmt(usableTb)} TB = ${fmt(totalAvailGb)} GB.</div>
+          <div class="show-my-work-line"><span class="show-my-work-var">Storage utilization %</span> = Storage used (GB) ÷ Usable storage (GB) = ${fmt(totalStorageUsedGb)} ÷ ${fmt(totalAvailGb)} = ${fmt(storageUtilPct)}%</div>
           <div class="show-my-work-line"><span class="show-my-work-var">Data stored (GB)</span> = ${dataStoredFormulaText} = ${fmt(dataStoredGbFromFormula)}</div>
+          ${storageUtilThresholdsPct != null ? `
+          <div class="show-my-work-line"><span class="show-my-work-var">Storage utilization % with thresholds</span>: MaxDataPct = min(stop_writes_at_storage_pct, 100 − min_available_storage_pct) across namespaces = ${fmt(maxDataPct)}%. Usable with thresholds = Usable storage × (MaxDataPct/100) = ${fmt(usableWithThresholdsGb)} GB. Storage utilization with thresholds = ${fmt(totalStorageUsedGb)} ÷ ${fmt(usableWithThresholdsGb)} = ${fmt(storageUtilThresholdsPct)}%</div>
+          ` : ''}
         </div>`;
       const memorySection = `
         <div class="show-my-work-section">
           <strong><span class="show-my-work-var">Memory utilization %</span></strong>
+          <div class="show-my-work-line">Fixed constants: <span class="show-my-work-var">RECORD_METADATA_BYTES</span> = ${RECORD_METADATA_BYTES} (Primary Index: 64 B per replicated object). Secondary Index: <span class="show-my-work-var">SI_ENTRY_SIZE_BYTES (S)</span> = ${SI_ENTRY_SIZE_BYTES}, <span class="show-my-work-var">SI_FILL_FACTOR (F)</span> = ${SI_FILL_FACTOR}, <span class="show-my-work-var">SI_CUSHION_PER_INDEX_PER_NODE_BYTES (H)</span> = ${SI_CUSHION_MIB} MiB.</div>
           <div class="show-my-work-line"><span class="show-my-work-var">Available mem per cluster</span> = Nodes × Available memory after overhead per node = ${fmt(availMemClusterGb)} GB.</div>
+          <div class="show-my-work-line"><span class="show-my-work-var">Total memory used base</span> = Primary Index Shmem (RF × Master object count × ${RECORD_METADATA_BYTES} B / 1024³) + Secondary Index Shmem (S, F, H).</div>
           <div class="show-my-work-line"><span class="show-my-work-var">Memory utilization (base) %</span> = Total memory used base (GB) ÷ Available mem per cluster (GB) = ${fmt(memUsedBaseGb)} ÷ ${fmt(availMemClusterGb)} = ${fmt(memUtilBasePct)}%</div>
           <div class="show-my-work-line"><span class="show-my-work-var">Memory utilization (w/ tombstones) %</span> = (Total memory used base + Tombstones) ÷ Available mem = (${fmt(memUsedBaseGb)} + ${fmt(memTombstonesGb)}) ÷ ${fmt(availMemClusterGb)} = ${fmt(memWithTombsGb)} ÷ ${fmt(availMemClusterGb)} = ${fmt(memUtilTombsPct)}%</div>
         </div>`;
@@ -654,7 +702,8 @@
         <div class="show-my-work-section">
           <strong><span class="show-my-work-var">Failure scenario</span> (${nodesLost} nodes lost)</strong>
           <div class="show-my-work-line"><span class="show-my-work-var">Effective nodes</span> = Nodes − Nodes lost = ${nodes} − ${nodesLost} = ${fmt(effectiveNodes)}</div>
-          <div class="show-my-work-line"><span class="show-my-work-var">Failure storage utilization %</span> = Data stored (GB) ÷ Failure usable storage (GB) = ${fmt(dataStoredGb)} ÷ ${fmt(failureAvailStorageGb)} = ${fmt(failureStorageUtilPct)}%</div>
+          <div class="show-my-work-line">Failure usable storage uses the same <span class="show-my-work-var">FRAGMENTATION_FACTOR</span> (${FRAGMENTATION_FACTOR}): Effective nodes × Devices per node × Device size × (1 − FRAGMENTATION_FACTOR) = ${fmt(failureAvailStorageGb)} GB.</div>
+          <div class="show-my-work-line"><span class="show-my-work-var">Failure storage utilization %</span> = Storage used (GB) ÷ Failure usable storage (GB) = ${fmt(totalStorageUsedGb)} ÷ ${fmt(failureAvailStorageGb)} = ${fmt(failureStorageUtilPct)}%</div>
           <div class="show-my-work-line"><span class="show-my-work-var">Failure memory utilization %</span> = Memory used (GB) ÷ (Effective nodes × Available mem per node) = ${fmt(failureMemUsedGb)} ÷ ${fmt(failureAvailMemGb)} = ${fmt(failureMemUtilPct)}%</div>
         </div>`;
       return storageSection + memorySection + failureSection;
@@ -670,6 +719,7 @@
           <div class="output-card">
             <div class="output-card-title">Storage</div>
             <div class="output-row primary"><span class="k">Storage utilization %</span><span class="v">${fmt(o.storage_utilization_pct)}%</span></div>
+            <div class="output-row"><span class="k">Storage utilization % with thresholds</span><span class="v">${typeof o.storage_utilization_with_thresholds_pct === 'number' ? fmt(o.storage_utilization_with_thresholds_pct) + '%' : '—'}</span></div>
             <div class="output-row"><span class="k">Data stored (TB)</span><span class="v">${fmt(o.data_stored_gb / 1024)}</span></div>
             <div class="output-row"><span class="k">Device total storage (TB)</span><span class="v">${fmt(o.device_total_storage_tb)}</span></div>
             <div class="output-row"><span class="k">Total device count</span><span class="v">${fmt(o.total_device_count)}</span></div>
@@ -700,19 +750,23 @@
           <div class="output-card">
             <div class="output-card-title">Projections</div>
             <div class="output-row"><span class="k">Current data stored (GB)</span><span class="v">${fmt(o.data_stored_gb)}</span></div>
-            <div class="output-row"><span class="k">Projected data (1 yr, GB)</span><span class="v">—</span></div>
-            <div class="output-row"><span class="k">Headroom to stop-writes %</span><span class="v">—</span></div>
-            <div class="output-row"><span class="k">Months to stop-writes (est)</span><span class="v">—</span></div>
+            <div class="output-row"><span class="k">Projected data (1 yr, GB)</span><span class="v">${o.projected_data_1yr_gb != null ? fmt(o.projected_data_1yr_gb) : '—'}</span></div>
+            <div class="output-row"><span class="k">Headroom to stop-writes %</span><span class="v">${o.headroom_to_stop_writes_pct != null ? fmt(o.headroom_to_stop_writes_pct) + '%' : '—'}</span></div>
+            <div class="output-row"><span class="k">Months to stop-writes (est)</span><span class="v">${o.months_to_stop_writes_est != null ? fmt(o.months_to_stop_writes_est) : '—'}</span></div>
           </div>
         </div>
         <div class="output-section">
           <div class="output-section-title">Performance</div>
           <div class="output-card">
-            <div class="output-card-title">Estimated ops</div>
-            <div class="output-row primary"><span class="k">Read ops/sec (est)</span><span class="v">—</span></div>
-            <div class="output-row primary"><span class="k">Write ops/sec (est)</span><span class="v">—</span></div>
-            <div class="output-row"><span class="k">Latency p99 read (ms)</span><span class="v">—</span></div>
-            <div class="output-row"><span class="k">Latency p99 write (ms)</span><span class="v">—</span></div>
+            <div class="output-card-title">Capacity planner v3.0</div>
+            <div class="output-row"><span class="k">Total IOPS per Node (K)</span><span class="v">${fmt(o.total_iops_per_node_k ?? 0)}</span></div>
+            <div class="output-row"><span class="k">Estimated IOPS (K) per cluster</span><span class="v">${fmt(o.estimated_iops_per_cluster_k ?? 0)}</span></div>
+            <div class="output-row primary"><span class="k">Reads per second (k)</span><span class="v">${fmt(o.reads_per_second_k ?? 0)}</span></div>
+            <div class="output-row primary"><span class="k">Writes per second (k)</span><span class="v">${fmt(o.writes_per_second_k ?? 0)}</span></div>
+            <div class="output-row"><span class="k">Read Bandwidth (MB/s)</span><span class="v">${fmt(o.read_bandwidth_mbs ?? 0)}</span></div>
+            <div class="output-row"><span class="k">Write Bandwidth (MB/s)</span><span class="v">${fmt(o.write_bandwidth_mbs ?? 0)}</span></div>
+            <div class="output-row"><span class="k">Total Throughput per Node (MB/s)</span><span class="v">${fmt(o.total_throughput_per_node_mbs ?? 0)}</span></div>
+            <div class="output-row"><span class="k">Peak Throughput per cluster (MB/s)</span><span class="v">${fmt(o.peak_throughput_per_cluster_mbs ?? 0)}</span></div>
           </div>
         </div>
       `;
@@ -724,8 +778,12 @@
     }
 
     document.getElementById('loadDefaults').addEventListener('click', async () => {
-      const flat = await fetchDefaults();
-      state = flatDefaultsToState(flat);
+      const data = await fetchDefaults();
+      if (data.cluster && Array.isArray(data.namespaces) && data.namespaces.length >= 1) {
+        state = defaultsClusterAndNamespacesToState(data);
+      } else {
+        state = flatDefaultsToState(data);
+      }
       renderInputs();
       await compute();
     });
@@ -789,10 +847,19 @@
       try {
         const config = await fetchInputConfig();
         if (config.schema) inputSchema = config.schema;
-        state = flatDefaultsToState(config.defaults || {});
+        const def = config.defaults || {};
+        if (def.cluster && Array.isArray(def.namespaces) && def.namespaces.length >= 1) {
+          state = defaultsClusterAndNamespacesToState(def);
+        } else {
+          state = flatDefaultsToState(def);
+        }
       } catch (e) {
-        const flat = await fetchDefaults();
-        state = flatDefaultsToState(flat);
+        const data = await fetchDefaults();
+        if (data.cluster && Array.isArray(data.namespaces) && data.namespaces.length >= 1) {
+          state = defaultsClusterAndNamespacesToState(data);
+        } else {
+          state = flatDefaultsToState(data);
+        }
       }
       renderInputs();
       await compute();

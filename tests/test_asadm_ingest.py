@@ -4,6 +4,7 @@ Unit tests for asadm-based collectinfo ingestion: run_asadm and parse_summary_ou
 
 import pytest
 from ingest.asadm_ingest import (
+    _available_memory_gb_from_system_free_mem,
     _sum_stat_column,
     parse_summary_output,
     parse_summary_output_multi,
@@ -111,6 +112,36 @@ def test_parse_summary_output_multi_returns_cluster_and_namespaces():
     assert multi["namespaces"][0].get("read_pct") == pytest.approx(0.24, rel=0.01)
 
 
+def test_parse_summary_output_multi_cluster_name_from_summary():
+    """When Cluster Summary has 'Cluster Name', cluster dict includes cluster_name."""
+    summary_with_name = """
+~~~~~~~~~~Cluster Summary~~~~~~~~~~
+Cluster Name               |wishrprde1
+Cluster Size               |18
+Devices Total              |396
+Devices Per-Node           |22
+Device Total               |21.270 TB
+Device Used                |3.885 TB
+Number of rows: 1
+
+~~~~~~~~~~Namespace Summary~~~~~~~~~~
+     Namespace|~~~~Drives~~~~|~~~~~~~~~~Device~~~~~~~~~~|Replication|  Cache|   Master|...
+              |Total|Per-Node|     Total|  Used%| Avail%|    Factors|  Read%|  Objects|...
+wi-pzn        |  216|      12| 11.602 TB|31.95 %|53.44 %|          2| 24.0 %|  6.447 G|...
+Number of rows: 1
+"""
+    multi = parse_summary_output_multi(summary_with_name)
+    assert multi["cluster"].get("cluster_name") == "wishrprde1"
+
+
+def test_parse_summary_output_multi_no_memory_total_omits_available_memory_gb():
+    """When summary has no Memory Total (7.x style), cluster does not set available_memory_gb."""
+    multi = parse_summary_output_multi(SAMPLE_SUMMARY)
+    assert "cluster" in multi
+    # SAMPLE_SUMMARY has no 'Memory ... Total' line, so available_memory_gb is left unset
+    assert "available_memory_gb" not in multi["cluster"]
+
+
 def test_parse_summary_output_multi_two_namespaces():
     """parse_summary_output_multi returns one dict per namespace row."""
     multi = parse_summary_output_multi(MULTI_NS_SUMMARY)
@@ -143,6 +174,11 @@ def test_run_asadm_missing_bundle():
 def test_asadm_summary_to_capacity_dict_missing_bundle():
     d = asadm_summary_to_capacity_dict("/nonexistent/bundle.zip")
     assert d == {}
+
+
+def test_available_memory_gb_from_system_free_mem_missing_bundle():
+    """_available_memory_gb_from_system_free_mem returns None when asadm fails (e.g. missing bundle)."""
+    assert _available_memory_gb_from_system_free_mem("/nonexistent/bundle.zip") is None
 
 
 def test_parse_size_k_m_g():

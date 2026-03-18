@@ -7,7 +7,7 @@ collectinfo plus logs and other artifacts. Design allows adding log discovery la
 
 import zipfile
 from pathlib import Path
-from typing import BinaryIO
+from typing import BinaryIO, Optional, Union
 
 # Common collectinfo naming patterns (case-insensitive)
 COLLECTINFO_NAME_PATTERNS = (
@@ -17,7 +17,7 @@ COLLECTINFO_NAME_PATTERNS = (
 )
 
 
-def list_bundle_contents(bundle_path: str | Path) -> list[str]:
+def list_bundle_contents(bundle_path: Union[str, Path]) -> list[str]:
     """List all entry names in a zip bundle."""
     path = Path(bundle_path)
     if not path.exists():
@@ -34,7 +34,7 @@ def _is_collectinfo_name(name: str) -> bool:
     return any(p in lower for p in COLLECTINFO_NAME_PATTERNS)
 
 
-def find_collectinfo_in_bundle(bundle_path: str | Path) -> list[str]:
+def find_collectinfo_in_bundle(bundle_path: Union[str, Path]) -> list[str]:
     """
     Return entry names inside the zip that are collectinfo files.
     Uses name patterns; does not inspect content.
@@ -44,7 +44,7 @@ def find_collectinfo_in_bundle(bundle_path: str | Path) -> list[str]:
 
 
 def extract_collectinfo_from_bundle(
-    bundle_path: str | Path, entry_name: str | None = None
+    bundle_path: Union[str, Path], entry_name: Optional[str] = None
 ) -> bytes:
     """
     Extract collectinfo content from the bundle as bytes.

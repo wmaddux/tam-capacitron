@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app.config import get_defaults, get_slider_specs
+from app.config import get_defaults, get_default_cluster_and_namespaces, get_slider_specs
 from core.model import (
     CapacityInputs,
     CapacityOutputs,
@@ -39,13 +39,19 @@ _DEFAULTS = get_defaults()
 
 @app.get("/api/defaults")
 def api_defaults() -> dict:
-    """Return default inputs for Load from defaults (from config/inputs.json)."""
+    """Return default inputs for Load from defaults (from config/inputs.json). When config has cluster and namespaces, returns { cluster, namespaces }; otherwise flat CapacityInputs-shaped dict."""
+    cluster, namespaces = get_default_cluster_and_namespaces()
+    if cluster is not None and namespaces is not None:
+        return {"cluster": cluster, "namespaces": namespaces}
     return get_default_inputs().to_dict()
 
 
 @app.get("/api/input-config")
 def api_input_config() -> dict:
-    """Return defaults and slider schema in one response for the UI."""
+    """Return defaults and slider schema in one response for the UI. Defaults are either { cluster, namespaces } or flat when config has no cluster/namespaces."""
+    cluster, namespaces = get_default_cluster_and_namespaces()
+    if cluster is not None and namespaces is not None:
+        return {"defaults": {"cluster": cluster, "namespaces": namespaces}, "schema": get_slider_specs()}
     return {"defaults": get_default_inputs().to_dict(), "schema": get_slider_specs()}
 
 
@@ -107,11 +113,14 @@ class ClusterBody(BaseModel):
     available_memory_gb: float = _DEFAULTS.get("available_memory_gb", 128.0)
     overhead_pct: float = _DEFAULTS.get("overhead_pct", 0.15)
     nodes_lost: float = _DEFAULTS.get("nodes_lost", 0.0)
+    data_growth_pct_per_year: float = 0.0
     cluster_name: str = ""
     default_storage_pattern: str = "HMA (MMD)"
     vcpus: float = 0.0
     instance_storage: str = ""
     instance_networking: str = ""
+    iops_per_disk_k: float = _DEFAULTS.get("iops_per_disk_k", 320.0)
+    throughput_per_disk_mbs: float = _DEFAULTS.get("throughput_per_disk_mbs", 1500.0)
 
 
 class NamespaceBody(BaseModel):
@@ -156,11 +165,14 @@ def api_compute_v2(body: ComputeV2Body) -> dict:
         available_memory_gb=body.cluster.available_memory_gb,
         overhead_pct=body.cluster.overhead_pct,
         nodes_lost=body.cluster.nodes_lost,
+        data_growth_pct_per_year=body.cluster.data_growth_pct_per_year,
         cluster_name=body.cluster.cluster_name,
         default_storage_pattern=body.cluster.default_storage_pattern,
         vcpus=body.cluster.vcpus,
         instance_storage=body.cluster.instance_storage or "",
         instance_networking=body.cluster.instance_networking or "",
+        iops_per_disk_k=body.cluster.iops_per_disk_k,
+        throughput_per_disk_mbs=body.cluster.throughput_per_disk_mbs,
     )
     namespaces = [
         NamespaceInputs(

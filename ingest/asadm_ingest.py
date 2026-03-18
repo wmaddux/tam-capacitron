@@ -260,6 +260,9 @@ def parse_summary_output(raw: str, namespace: str | None = None) -> dict:
 def _build_cluster_dict_from_summary(cs: dict) -> dict:
     """Build cluster-level dict from cluster summary table."""
     out: dict = {}
+    cluster_name = cs.get("Cluster Name")
+    if cluster_name is not None and str(cluster_name).strip():
+        out["cluster_name"] = str(cluster_name).strip()
     cluster_size = cs.get("Cluster Size")
     if cluster_size:
         try:
@@ -297,8 +300,8 @@ def _build_cluster_dict_from_summary(cs: dict) -> dict:
             pass
     out["nodes_lost"] = 0.0
     out["overhead_pct"] = 0.15
-    out.setdefault("available_memory_gb", 64.0)
     # Memory (Data + Indexes) Total or Memory Total (TB/GB) -> available_memory_gb per node
+    # (Absent in 7.1/7.2 summary; caller should use _available_memory_gb_from_system_free_mem.)
     nodes = out.get("nodes_per_cluster")
     for key, val in cs.items():
         if val and "Memory" in key and "Total" in key and "Used" not in key:
@@ -425,6 +428,48 @@ def parse_summary_output_multi(raw: str) -> dict:
     return result
 
 
+def _available_memory_gb_from_system_free_mem(bundle_path: str) -> float | None:
+    """
+    Derive available memory per node (GB) from system_free_mem stats when summary has no
+    Memory Total (e.g. Aerospike 7.1/7.2 summary only shows Shmem Index Used).
+    For each node: total_mem_kB = system_free_mem_kbytes / (system_free_mem_pct / 100).
+    Returns mean(total_mem_kB) / 1024 / 1024 as GB per node for the cluster, or None if
+    stats are missing or parse fails.
+    """
+    stdout, err = run_asadm(
+        bundle_path,
+        "show statistics like system_free_mem -flip",
+    )
+    if err or not stdout:
+        return None
+    totals_kb: list[float] = []
+    for line in (stdout or "").splitlines():
+        if "|" not in line:
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) < 3:
+            continue
+        free_kb_s = parts[1].replace(" ", "")
+        pct_s = parts[2].replace(" ", "").replace("%", "")
+        if not free_kb_s.replace(".", "").replace("-", "").isdigit():
+            continue
+        if not pct_s.replace(".", "").replace("-", "").isdigit():
+            continue
+        try:
+            free_kb = float(free_kb_s)
+            pct = float(pct_s)
+            if pct <= 0 or pct > 100:
+                continue
+            total_kb = free_kb / (pct / 100.0)
+            totals_kb.append(total_kb)
+        except ValueError:
+            continue
+    if not totals_kb:
+        return None
+    mean_kb = sum(totals_kb) / len(totals_kb)
+    return mean_kb / (1024.0 * 1024.0)
+
+
 def _sum_stat_column(raw: str) -> float:
     """
     Parse asadm flipped stat output (e.g. show stat namespace X like device_used_bytes -flip).
@@ -494,6 +539,11 @@ def asadm_summary_to_capacity_multi(bundle_path: str) -> dict:
     if err or not stdout:
         return {"cluster": {}, "namespaces": []}
     result = parse_summary_output_multi(stdout)
+    # When summary has no Memory Total (e.g. 7.1/7.2), derive from system_free_mem per node
+    if result.get("cluster") is not None and "available_memory_gb" not in result["cluster"]:
+        gb = _available_memory_gb_from_system_free_mem(bundle_path)
+        if gb is not None and gb > 0:
+            result["cluster"]["available_memory_gb"] = gb
     for ns_dict in result.get("namespaces") or []:
         name = (ns_dict.get("name") or "").strip()
         if not name:

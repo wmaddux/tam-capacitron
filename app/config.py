@@ -37,6 +37,19 @@ def get_defaults() -> dict[str, Any]:
     return cfg.get("defaults", {}).copy()
 
 
+def get_default_cluster_and_namespaces() -> tuple[dict[str, Any] | None, list[dict[str, Any]] | None]:
+    """
+    Return (cluster, namespaces) when config has both "cluster" and "namespaces".
+    Otherwise return (None, None) so callers can use flat defaults.
+    """
+    cfg = _load_config()
+    cluster = cfg.get("cluster")
+    namespaces = cfg.get("namespaces")
+    if isinstance(cluster, dict) and isinstance(namespaces, list) and len(namespaces) >= 1:
+        return cluster.copy(), [ns.copy() if isinstance(ns, dict) else {} for ns in namespaces]
+    return None, None
+
+
 def get_slider_specs() -> dict[str, dict[str, float]]:
     """Return slider metadata: { key: { min, max, step }, ... }."""
     cfg = _load_config()

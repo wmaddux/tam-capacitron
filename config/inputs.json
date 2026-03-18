@@ -15,6 +15,41 @@
     "si_entries_per_object": 0,
     "nodes_lost": 0
   },
+  "cluster": {
+    "cluster_name": "",
+    "default_storage_pattern": "HMA (MMD)",
+    "nodes_per_cluster": 6,
+    "devices_per_node": 3,
+    "device_size_gb": 256,
+    "available_memory_gb": 128,
+    "overhead_pct": 0.15,
+    "nodes_lost": 0,
+    "data_growth_pct_per_year": 0,
+    "vcpus": 0,
+    "instance_storage": "",
+    "instance_networking": "",
+    "iops_per_disk_k": 320,
+    "throughput_per_disk_mbs": 1500
+  },
+  "namespaces": [
+    {
+      "name": "",
+      "replication_factor": 2,
+      "master_object_count": 1000000,
+      "avg_record_size_bytes": 500,
+      "read_pct": 0.5,
+      "write_pct": 0.5,
+      "tombstone_pct": 0,
+      "si_count": 0,
+      "si_entries_per_object": 0,
+      "storage_pattern": "HMA (MMD)",
+      "placement": { "primary": "M", "si": "M", "data": "D" },
+      "compression_ratio": 1,
+      "stop_writes_at_storage_pct": 90,
+      "evict_at_memory_pct": 95,
+      "min_available_storage_pct": 5
+    }
+  ],
   "sliders": {
     "replication_factor": { "min": 1, "max": 4, "step": 1 },
     "nodes_per_cluster": { "min": 1, "max": 64, "step": 1 },
@@ -29,6 +64,9 @@
     "tombstone_pct": { "min": 0, "max": 0.5, "step": 0.01 },
     "si_count": { "min": 0, "max": 20, "step": 1 },
     "si_entries_per_object": { "min": 0, "max": 10, "step": 0.1 },
-    "nodes_lost": { "min": 0, "max": 16, "step": 1 }
+    "nodes_lost": { "min": 0, "max": 16, "step": 1 },
+    "data_growth_pct_per_year": { "min": 0, "max": 100, "step": 1 },
+    "iops_per_disk_k": { "min": 0, "max": 1000, "step": 1 },
+    "throughput_per_disk_mbs": { "min": 0, "max": 3000, "step": 1 }
   }
 }

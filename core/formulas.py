@@ -200,3 +200,74 @@ def failure_storage_utilization_pct(
     if failure_total_available_gb <= 0:
         return 0.0
     return 100.0 * data_stored_gb / failure_total_available_gb
+
+
+def usable_storage_with_max_data_pct(
+    total_usable_storage_gb: float, max_data_pct: float
+) -> float:
+    """Usable storage (GB) after applying MaxDataPct: total_usable × (max_data_pct / 100)."""
+    if max_data_pct <= 0:
+        return 0.0
+    return total_usable_storage_gb * (max_data_pct / 100.0)
+
+
+def storage_utilization_with_thresholds_pct(
+    total_storage_used_gb: float, usable_storage_with_thresholds_gb: float
+) -> float:
+    """Storage utilization % with thresholds: 100 × (storage used / usable with MaxDataPct)."""
+    if usable_storage_with_thresholds_gb <= 0:
+        return 0.0
+    return 100.0 * total_storage_used_gb / usable_storage_with_thresholds_gb
+
+
+# --- Performance (Capacity planner v3.0) ---
+
+
+def total_iops_per_node_k(devices_per_node: float, iops_per_disk_k: float) -> float:
+    """Total IOPS per node (K): devices per node × IOPS per disk (K)."""
+    return devices_per_node * iops_per_disk_k
+
+
+def estimated_iops_per_cluster_k(
+    nodes_per_cluster: float, total_iops_per_node_k: float
+) -> float:
+    """Estimated IOPS (K) per cluster: nodes × total IOPS per node (K)."""
+    return nodes_per_cluster * total_iops_per_node_k
+
+
+def reads_per_second_k(avg_read_pct: float, estimated_iops_per_cluster_k: float) -> float:
+    """Reads per second (k): Avg Read pct × Estimated IOPS (K) per cluster."""
+    return avg_read_pct * estimated_iops_per_cluster_k
+
+
+def writes_per_second_k(avg_write_pct: float, estimated_iops_per_cluster_k: float) -> float:
+    """Writes per second (k): Avg Write pct × Estimated IOPS (K) per cluster."""
+    return avg_write_pct * estimated_iops_per_cluster_k
+
+
+def read_bandwidth_mbs(
+    reads_per_second_k: float, avg_record_size_bytes: float
+) -> float:
+    """Read Bandwidth (MB/s): Reads per second (k) × 1000 × Avg record size (bytes) / 1024²."""
+    return reads_per_second_k * 1000.0 * avg_record_size_bytes / (1024.0**2)
+
+
+def write_bandwidth_mbs(
+    writes_per_second_k: float, avg_record_size_bytes: float
+) -> float:
+    """Write Bandwidth (MB/s): Writes per second (k) × 1000 × Avg record size (bytes) / 1024²."""
+    return writes_per_second_k * 1000.0 * avg_record_size_bytes / (1024.0**2)
+
+
+def total_throughput_per_node_mbs(
+    devices_per_node: float, throughput_per_disk_mbs: float
+) -> float:
+    """Total Throughput per Node (MB/s): devices per node × Throughput per disk (MB/s)."""
+    return devices_per_node * throughput_per_disk_mbs
+
+
+def peak_throughput_per_cluster_mbs(
+    total_throughput_per_node_mbs: float, nodes_per_cluster: float
+) -> float:
+    """Peak Throughput per cluster (MB/s): Total Throughput per Node (MB/s) × Nodes per cluster."""
+    return total_throughput_per_node_mbs * nodes_per_cluster

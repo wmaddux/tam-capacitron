@@ -6,6 +6,8 @@ Returns CapacityOutputs. No UI; used by API and tests.
 Placement-aware: per-namespace memory and storage depend on storage pattern (PI/SI/data on M or D).
 """
 
+import math
+
 from core.model import (
     CapacityInputs,
     CapacityOutputs,
@@ -28,6 +30,39 @@ def _placement_from_pattern(storage_pattern: str) -> dict[str, str]:
     if p == "DMD":
         return {"primary": "D", "si": "M", "data": "D"}
     return {"primary": "M", "si": "M", "data": "D"}
+
+
+def _projected_data_1yr_gb(data_stored_gb: float, data_growth_pct_per_year: float) -> float:
+    """Projected data (GB) after 1 year: current × (1 + growth_rate/100)."""
+    return data_stored_gb * (1.0 + data_growth_pct_per_year / 100.0)
+
+
+def _headroom_to_stop_writes_pct(
+    data_stored_gb: float, usable_storage_with_thresholds_gb: float
+) -> float | None:
+    """Headroom to stop-writes %: 100 × (limit − data_stored) / limit. None if limit <= 0."""
+    if usable_storage_with_thresholds_gb <= 0:
+        return None
+    return 100.0 * (usable_storage_with_thresholds_gb - data_stored_gb) / usable_storage_with_thresholds_gb
+
+
+def _months_to_stop_writes_est(
+    data_stored_gb: float,
+    usable_storage_with_thresholds_gb: float,
+    data_growth_pct_per_year: float,
+) -> float | None:
+    """Months until data reaches stop-writes limit (est). None if growth <= 0 or already at/over limit."""
+    if data_growth_pct_per_year <= 0 or usable_storage_with_thresholds_gb <= 0:
+        return None
+    if data_stored_gb >= usable_storage_with_thresholds_gb or data_stored_gb <= 0:
+        return None
+    ratio = usable_storage_with_thresholds_gb / data_stored_gb
+    log_ratio = math.log(ratio)
+    log_growth = math.log(1.0 + data_growth_pct_per_year / 100.0)
+    if log_growth <= 0:
+        return None
+    months = 12.0 * log_ratio / log_growth
+    return max(0.0, months)
 
 
 def _get_placement(ns: NamespaceInputs) -> dict[str, str]:
@@ -163,6 +198,20 @@ def run_multi(cluster: ClusterInputs, namespaces: list[NamespaceInputs]) -> Capa
     storage_utilization_pct = F.storage_utilization_pct(
         total_storage_used_gb, total_usable_storage_gb
     )
+    # MaxDataPct = min(stop_writes_at_storage_pct, 100 - min_available_storage_pct); use min across namespaces (most conservative)
+    max_data_pct = 100.0
+    for ns in namespaces:
+        stop = getattr(ns, "stop_writes_at_storage_pct", 90.0) or 90.0
+        min_avail = getattr(ns, "min_available_storage_pct", 5.0) or 5.0
+        pct = min(stop, 100.0 - min_avail)
+        if pct < max_data_pct:
+            max_data_pct = pct
+    usable_storage_with_thresholds_gb = F.usable_storage_with_max_data_pct(
+        total_usable_storage_gb, max_data_pct
+    )
+    storage_utilization_with_thresholds_pct = F.storage_utilization_with_thresholds_pct(
+        total_storage_used_gb, usable_storage_with_thresholds_gb
+    )
     memory_utilization_base_pct = F.memory_utilization_base_pct(
         total_memory_used_base_gb, available_mem_per_cluster_gb
     )
@@ -182,6 +231,58 @@ def run_multi(cluster: ClusterInputs, namespaces: list[NamespaceInputs]) -> Capa
         else 0.0
     )
 
+    # --- Performance (Capacity planner v3.0): effective read/write pct and avg record size (weighted by data_stored_gb) ---
+    total_iops_per_node_k = 0.0
+    estimated_iops_per_cluster_k = 0.0
+    reads_per_second_k = 0.0
+    writes_per_second_k = 0.0
+    read_bandwidth_mbs = 0.0
+    write_bandwidth_mbs = 0.0
+    total_throughput_per_node_mbs = 0.0
+    peak_throughput_per_cluster_mbs = 0.0
+    iops_per_disk_k = getattr(cluster, "iops_per_disk_k", 0.0) or 0.0
+    throughput_per_disk_mbs = getattr(cluster, "throughput_per_disk_mbs", 0.0) or 0.0
+    if iops_per_disk_k > 0 or throughput_per_disk_mbs > 0:
+        if total_data_stored_gb > 0 and per_namespace_list:
+            weight_sum = sum(p.get("data_stored_gb", 0) or 0 for p in per_namespace_list)
+            if weight_sum > 0:
+                read_pct_eff = sum(
+                    (getattr(ns, "read_pct", 0.5) or 0.5) * (per_namespace_list[i].get("data_stored_gb") or 0)
+                    for i, ns in enumerate(namespaces)
+                ) / weight_sum
+                write_pct_eff = sum(
+                    (getattr(ns, "write_pct", 0.5) or 0.5) * (per_namespace_list[i].get("data_stored_gb") or 0)
+                    for i, ns in enumerate(namespaces)
+                ) / weight_sum
+                avg_record_size_eff = sum(
+                    (getattr(ns, "avg_record_size_bytes", 500) or 500) * (per_namespace_list[i].get("data_stored_gb") or 0)
+                    for i, ns in enumerate(namespaces)
+                ) / weight_sum
+            else:
+                read_pct_eff = getattr(namespaces[0], "read_pct", 0.5) or 0.5
+                write_pct_eff = getattr(namespaces[0], "write_pct", 0.5) or 0.5
+                avg_record_size_eff = getattr(namespaces[0], "avg_record_size_bytes", 500) or 500
+        else:
+            read_pct_eff = getattr(namespaces[0], "read_pct", 0.5) or 0.5 if namespaces else 0.5
+            write_pct_eff = getattr(namespaces[0], "write_pct", 0.5) or 0.5 if namespaces else 0.5
+            avg_record_size_eff = getattr(namespaces[0], "avg_record_size_bytes", 500) or 500 if namespaces else 500
+        if iops_per_disk_k > 0:
+            total_iops_per_node_k = F.total_iops_per_node_k(cluster.devices_per_node, iops_per_disk_k)
+            estimated_iops_per_cluster_k = F.estimated_iops_per_cluster_k(
+                cluster.nodes_per_cluster, total_iops_per_node_k
+            )
+            reads_per_second_k = F.reads_per_second_k(read_pct_eff, estimated_iops_per_cluster_k)
+            writes_per_second_k = F.writes_per_second_k(write_pct_eff, estimated_iops_per_cluster_k)
+            read_bandwidth_mbs = F.read_bandwidth_mbs(reads_per_second_k, avg_record_size_eff)
+            write_bandwidth_mbs = F.write_bandwidth_mbs(writes_per_second_k, avg_record_size_eff)
+        if throughput_per_disk_mbs > 0:
+            total_throughput_per_node_mbs = F.total_throughput_per_node_mbs(
+                cluster.devices_per_node, throughput_per_disk_mbs
+            )
+            peak_throughput_per_cluster_mbs = F.peak_throughput_per_cluster_mbs(
+                total_throughput_per_node_mbs, cluster.nodes_per_cluster
+            )
+
     return CapacityOutputs(
         device_total_storage_tb=device_total_storage_tb,
         total_device_count=total_device_count,
@@ -189,6 +290,8 @@ def run_multi(cluster: ClusterInputs, namespaces: list[NamespaceInputs]) -> Capa
         total_available_storage_gb=total_usable_storage_gb,
         total_storage_used_gb=total_storage_used_gb,
         storage_utilization_pct=storage_utilization_pct,
+        storage_utilization_with_thresholds_pct=storage_utilization_with_thresholds_pct,
+        usable_storage_with_thresholds_gb=usable_storage_with_thresholds_gb,
         available_mem_per_cluster_gb=available_mem_per_cluster_gb,
         memory_utilization_base_pct=memory_utilization_base_pct,
         total_memory_used_base_gb=total_memory_used_base_gb,
@@ -201,6 +304,27 @@ def run_multi(cluster: ClusterInputs, namespaces: list[NamespaceInputs]) -> Capa
         failure_memory_utilization_pct=failure_memory_util_pct,
         failure_memory_used_gb=total_memory_used_base_gb,
         per_namespace=per_namespace_list,
+        projected_data_1yr_gb=_projected_data_1yr_gb(
+            total_data_stored_gb,
+            getattr(cluster, "data_growth_pct_per_year", 0.0) or 0.0,
+        ),
+        headroom_to_stop_writes_pct=_headroom_to_stop_writes_pct(
+            total_data_stored_gb,
+            usable_storage_with_thresholds_gb,
+        ),
+        months_to_stop_writes_est=_months_to_stop_writes_est(
+            total_data_stored_gb,
+            usable_storage_with_thresholds_gb,
+            getattr(cluster, "data_growth_pct_per_year", 0.0) or 0.0,
+        ),
+        total_iops_per_node_k=total_iops_per_node_k,
+        estimated_iops_per_cluster_k=estimated_iops_per_cluster_k,
+        reads_per_second_k=reads_per_second_k,
+        writes_per_second_k=writes_per_second_k,
+        read_bandwidth_mbs=read_bandwidth_mbs,
+        write_bandwidth_mbs=write_bandwidth_mbs,
+        total_throughput_per_node_mbs=total_throughput_per_node_mbs,
+        peak_throughput_per_cluster_mbs=peak_throughput_per_cluster_mbs,
     )
 
 

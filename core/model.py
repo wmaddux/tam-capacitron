@@ -31,6 +31,11 @@ class ClusterInputs:
     vcpus: float = 0.0
     instance_storage: str = ""
     instance_networking: str = ""
+    # Data growth (% per year) for projected data and months-to-stop-writes
+    data_growth_pct_per_year: float = 0.0
+    # Performance (Capacity planner v3.0)
+    iops_per_disk_k: float = 320.0
+    throughput_per_disk_mbs: float = 1500.0
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "ClusterInputs":
@@ -153,6 +158,8 @@ class CapacityOutputs:
     total_available_storage_gb: float = 0.0
     total_storage_used_gb: float = 0.0
     storage_utilization_pct: float = 0.0
+    storage_utilization_with_thresholds_pct: float = 0.0
+    usable_storage_with_thresholds_gb: float = 0.0  # for Show my work / headroom
 
     # Healthy cluster – memory
     available_mem_per_cluster_gb: float = 0.0
@@ -171,6 +178,21 @@ class CapacityOutputs:
 
     # Per-namespace breakdown (optional)
     per_namespace: list = field(default_factory=list)
+
+    # Data growth (optional; requires data_growth_pct_per_year and thresholds)
+    projected_data_1yr_gb: float | None = None
+    headroom_to_stop_writes_pct: float | None = None
+    months_to_stop_writes_est: float | None = None
+
+    # Performance (Capacity planner v3.0; requires iops_per_disk_k, throughput_per_disk_mbs)
+    total_iops_per_node_k: float = 0.0
+    estimated_iops_per_cluster_k: float = 0.0
+    reads_per_second_k: float = 0.0
+    writes_per_second_k: float = 0.0
+    read_bandwidth_mbs: float = 0.0
+    write_bandwidth_mbs: float = 0.0
+    total_throughput_per_node_mbs: float = 0.0
+    peak_throughput_per_cluster_mbs: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

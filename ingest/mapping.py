@@ -131,6 +131,8 @@ def ingestor_multi_to_cluster_and_namespaces(multi_output: dict) -> dict:
         "available_memory_gb": _float(cluster_in, "available_memory_gb", defaults.available_memory_gb),
         "overhead_pct": _float(cluster_in, "overhead_pct", defaults.overhead_pct),
         "nodes_lost": _float(cluster_in, "nodes_lost", 0.0),
+        "iops_per_disk_k": _float(cluster_in, "iops_per_disk_k", 320.0),
+        "throughput_per_disk_mbs": _float(cluster_in, "throughput_per_disk_mbs", 1500.0),
     }
     if cluster["nodes_per_cluster"] < 1:
         cluster["nodes_per_cluster"] = defaults.nodes_per_cluster
